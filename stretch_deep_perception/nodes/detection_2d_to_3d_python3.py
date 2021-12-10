@@ -123,7 +123,7 @@ def bounding_box_2d_to_3d(points_array, box_2d, camera_matrix, head_to_camera_ma
     min_number_of_points_for_plane_fitting = 16
     enough_points = (num_points >= min_number_of_points_for_plane_fitting)
     if fit_plane and (not enough_points):
-        print('WARNING: There are too few points from the depth image for plane fitting. number of points =', num_points)
+        print('WARNING detection_2d_to_3d: There are too few points from the depth image for plane fitting. number of points =', num_points)
     elif fit_plane:
         plane = fp.FitPlane()
         plane.fit_svd(points_array, verbose=False)

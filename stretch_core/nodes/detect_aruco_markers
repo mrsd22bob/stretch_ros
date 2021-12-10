@@ -217,7 +217,7 @@ class ArucoMarker:
             num_points = self.points_array.shape[0]
             min_number_of_points_for_plane_fitting = 16
             if num_points < min_number_of_points_for_plane_fitting:
-                print('WARNING: There are too few points from the depth image for plane fitting, so only using the RGB ArUco estimate. number of points =', num_points)
+                print('WARNING aruco_markers: There are too few points from the depth image for plane fitting, so only using the RGB ArUco estimate. number of points =', num_points)
                 only_use_rgb = True
         else:
             only_use_rgb = True
@@ -598,8 +598,8 @@ class DetectArucoNode:
         self.depth_image_timestamp = None        
         self.camera_info = None
         self.all_points = []
-        self.show_debug_images = False
-        self.publish_marker_point_clouds = False
+        self.show_debug_images = True
+        self.publish_marker_point_clouds = True
 
     def image_callback(self, ros_rgb_image, ros_depth_image, rgb_camera_info):
         try:
@@ -611,7 +611,7 @@ class DetectArucoNode:
             print(error)
 
         self.camera_info = rgb_camera_info
-            
+
         # Copy the depth image to avoid a change to the depth image
         # during the update.
         time_diff = self.rgb_image_timestamp - self.depth_image_timestamp
@@ -664,7 +664,8 @@ class DetectArucoNode:
         self.all_points.extend(points)
 
     def add_point_array_to_point_cloud(self, point_array):
-        self.all_points.extend(list(point_array))
+        if point_array is not None:
+            self.all_points.extend(list(point_array))
         
     def publish_point_cloud(self):
         header = Header()

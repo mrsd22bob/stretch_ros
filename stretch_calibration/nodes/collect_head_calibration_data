@@ -67,7 +67,9 @@ class CollectHeadCalibrationDataNode:
             self.shoulder_marker_pose = None
 
             self.marker_time = None
+            self.marker_names = []
             for marker in marker_array.markers:
+                self.marker_names.append(marker.text)
 
                 # set marker_time to the earliest marker time
                 if self.marker_time is None:
@@ -90,6 +92,7 @@ class CollectHeadCalibrationDataNode:
                 if marker.id == self.shoulder_marker_id:
                     self.shoulder_marker_pose = marker.pose
 
+            print(self.marker_names)
 
     def move_to_pose(self, pose):
         # Prepare and send a goal pose to which the robot should move.
