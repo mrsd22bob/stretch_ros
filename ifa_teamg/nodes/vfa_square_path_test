@@ -17,7 +17,7 @@ class Square_Path_Test(hm.HelloNode):
 
 	self.rate = 10.0
 
-        self.square_side = 4.0
+        self.square_side = 0.5
         self.rotation_angle = math.pi/2  # In radians
         self.mode = 'position'
         self.straight_command = {'joint': 'translate_mobile_base', 'inc': self.square_side}
@@ -32,6 +32,18 @@ class Square_Path_Test(hm.HelloNode):
         trajectory_goal.trajectory.joint_names = [joint_name]
 
         goal_point.positions = [self.straight_command['inc']]
+        trajectory_goal.trajectory.points = [goal_point]
+        trajectory_goal.trajectory.header.stamp = rospy.Time.now()
+        self.trajectory_client.send_goal(trajectory_goal)
+
+	self.trajectory_client.wait_for_result()
+
+    def back_motion(self, goal_point, trajectory_goal):
+
+	joint_name = self.straight_command['joint']
+        trajectory_goal.trajectory.joint_names = [joint_name]
+
+        goal_point.positions = [-self.straight_command['inc']]
         trajectory_goal.trajectory.points = [goal_point]
         trajectory_goal.trajectory.header.stamp = rospy.Time.now()
         self.trajectory_client.send_goal(trajectory_goal)
@@ -61,14 +73,19 @@ class Square_Path_Test(hm.HelloNode):
         trajectory_goal = FollowJointTrajectoryGoal()
         trajectory_goal.goal_time_tolerance = rospy.Time(1.0)
 
+	while True:
+
+		self.straight_motion(goal_point, trajectory_goal)
+		self.back_motion(goal_point, trajectory_goal)
+
+
+	'''self.rotate(goal_point, trajectory_goal)
 	self.straight_motion(goal_point, trajectory_goal)
 	self.rotate(goal_point, trajectory_goal)
 	self.straight_motion(goal_point, trajectory_goal)
 	self.rotate(goal_point, trajectory_goal)
 	self.straight_motion(goal_point, trajectory_goal)
-	self.rotate(goal_point, trajectory_goal)
-	self.straight_motion(goal_point, trajectory_goal)
-	self.rotate(goal_point, trajectory_goal)
+	self.rotate(goal_point, trajectory_goal)'''
 
         #joint_name = self.straight_command['joint']
         #trajectory_goal.trajectory.joint_names = [joint_name]

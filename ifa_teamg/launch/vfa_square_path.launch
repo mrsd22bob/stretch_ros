@@ -6,8 +6,8 @@
   <include file="$(find stretch_core)/launch/stretch_driver.launch" pass_all_args="true"/>
   <!-- -->
     
-  <!-- KEYBOARD TELEOP -->
-  <node name="vfa_square_path_test" pkg="stretch_demos" type="vfa_square_path_test" output="screen" args=''/>
+  <!-- SQUARE PATH TESTING LAUNCH -->
+  <node name="vfa_square_path_test" pkg="ifa_teamg" type="vfa_square_path_test" output="screen" args=''/>
   <!-- -->
     
 </launch>
