@@ -290,7 +290,7 @@ class GetKeyboardCommands:
             self.step_size = 'small'
         if c == 'q' or c == 'Q':
             rospy.loginfo('keyboard_teleop exiting...')
-            rospy.signal_shutdown('Received quit character (q), so exiting')
+            rospy.signal_shutdown('Received quit character (q), so exciting')
 
         ####################################################
 
