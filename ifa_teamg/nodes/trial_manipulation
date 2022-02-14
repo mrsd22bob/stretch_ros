@@ -1,0 +1,85 @@
+#!/usr/bin/env python
+
+import rospy
+from std_srvs.srv import Trigger, TriggerRequest
+from sensor_msgs.msg import JointState
+from control_msgs.msg import FollowJointTrajectoryGoal
+from trajectory_msgs.msg import JointTrajectoryPoint
+
+import hello_helpers.hello_misc as hm
+import math
+
+
+class Square_Path_Test(hm.HelloNode):
+
+    def __init__(self):
+        hm.HelloNode.__init__(self)
+
+	self.rate = 10.0
+
+        self.square_side = 3.5
+        self.rotation_angle = -math.pi/2  # In radians
+        self.mode = 'position'
+        self.random_pose1 = {'wrist_extension':0.3, 'joint_lift': 0.5 }
+	self.random_pose2 = {'wrist_extension':0.25, 'joint_lift': 0.5 }
+	#self.random_pose3 = {'wrist_extension':0.5, 'joint_lift': 1 }
+	#self.random_pose4 = {'wrist_extension':0.1, 'joint_lift': 0.5 }
+        self.cw_command = {'joint': 'rotate_mobile_base', 'inc': -self.rotation_angle}
+        self.ccw_command = {'joint': 'rotate_mobile_base', 'inc': self.rotation_angle}
+
+    #def display_test_stats():
+
+    def command_random(self):
+
+	self.move_to_pose(self.random_pose1)
+
+	self.trajectory_client.wait_for_result()
+
+	self.move_to_pose(self.random_pose2)
+
+	self.trajectory_client.wait_for_result()
+
+	#self.move_to_pose(self.random_pose3)
+
+	#self.trajectory_client.wait_for_result()
+
+	#self.move_to_pose(self.random_pose4)
+
+	#self.trajectory_client.wait_for_result()
+
+    def get_command(self):
+	joint_name = raw_input('Enter the joint name: ')
+	ext = int(input('Enter the increment: '))
+	self.send_command(joint_name, ext)
+
+    def send_command(self, joint_name, ext):
+	self.move_to_pose({joint_name: ext})
+
+
+
+	
+
+    def begin_test_cw(self):
+
+	rate = rospy.Rate(self.rate)
+	self.command_random()
+	
+
+    def main(self):
+	hm.HelloNode.main(self,'vfa_square_path', 'vfa_square_path', wait_for_first_pointcloud=False)
+
+if __name__ == '__main__':
+
+    #rospy.init_node('manipu', anonymous=False)
+
+    try:
+        node = Square_Path_Test()
+	node.main()
+	
+	while True:
+		node.get_command()
+
+    except KeyboardInterrupt:
+        rospy.loginfo('interrupt received bro!!! Gotcha!')
+	
+    #rospy.spin()

@@ -17,8 +17,8 @@ class Square_Path_Test(hm.HelloNode):
 
 	self.rate = 10.0
 
-        self.square_side = 0.5
-        self.rotation_angle = math.pi/2  # In radians
+        self.square_side = 3.5
+        self.rotation_angle = -math.pi/2  # In radians
         self.mode = 'position'
         self.straight_command = {'joint': 'translate_mobile_base', 'inc': self.square_side}
         self.cw_command = {'joint': 'rotate_mobile_base', 'inc': -self.rotation_angle}
@@ -73,19 +73,16 @@ class Square_Path_Test(hm.HelloNode):
         trajectory_goal = FollowJointTrajectoryGoal()
         trajectory_goal.goal_time_tolerance = rospy.Time(1.0)
 
-	while True:
-
-		self.straight_motion(goal_point, trajectory_goal)
-		self.back_motion(goal_point, trajectory_goal)
-
-
-	'''self.rotate(goal_point, trajectory_goal)
+	#while True:
 	self.straight_motion(goal_point, trajectory_goal)
+	#self.back_motion(goal_point, trajectory_goal)
 	self.rotate(goal_point, trajectory_goal)
 	self.straight_motion(goal_point, trajectory_goal)
 	self.rotate(goal_point, trajectory_goal)
 	self.straight_motion(goal_point, trajectory_goal)
-	self.rotate(goal_point, trajectory_goal)'''
+	self.rotate(goal_point, trajectory_goal)
+	self.straight_motion(goal_point, trajectory_goal)
+	self.rotate(goal_point, trajectory_goal)
 
         #joint_name = self.straight_command['joint']
         #trajectory_goal.trajectory.joint_names = [joint_name]
@@ -118,7 +115,9 @@ if __name__ == '__main__':
     try:
         node = Square_Path_Test()
 	node.main()
-        node.begin_test_cw()
+	node.begin_test_cw()
+	#rospy.init_node('cw_test_server')
+	#s = rospy.Service('start_cw', Trigger, node.begin_test_cw)
 
     except KeyboardInterrupt:
         rospy.loginfo('interrupt received bro!!! Gotcha!')
