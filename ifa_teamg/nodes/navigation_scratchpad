@@ -1,11 +1,13 @@
 #!/usr/bin/env python
 
+from re import X
 import rospy
 from std_srvs.srv import Trigger, TriggerRequest
 from sensor_msgs.msg import JointState, PointCloud2, LaserScan
 from control_msgs.msg import FollowJointTrajectoryGoal
 from trajectory_msgs.msg import JointTrajectoryPoint
 
+from scipy import optimize
 
 import hello_helpers.hello_misc as hm
 import math
@@ -13,7 +15,6 @@ import ros_numpy as rnp
 import numpy as np
 
 import laser_geometry.laser_geometry as lg
-
 import matplotlib.pyplot as plt
 
 lp = lg.LaserProjection()
@@ -59,99 +60,69 @@ class Robot(hm.HelloNode):
 
         self.trajectory_client.wait_for_result()
 
-    def process_lidar(self, scan_data):
-
-        ranges = np.asarray(scan_data.ranges)
-
-        print(ranges[0])
-
-        thetas = np.asarray([i*0.00872665 for i in range(0,720,1)])
-
-        print(ranges.reshape(1,-1).shape)
-
-        print(thetas.reshape(1,-1).shape)
-
-
-        ranges = np.vstack((ranges.reshape(1,-1),thetas.reshape(1,-1)))
-
-        print(ranges.shape)
-
-        # print(np.where((ranges[0,:] < 12) & (ranges[0,:] > 0)))
-
-        cols = np.where((ranges[0,:] < 12) & (ranges[0,:] > 0))
-
-
-
-
-        xyz_laser = np.asarray([ranges[0,0]*-np.cos(ranges[1,0]), ranges[0,0]*-np.sin(ranges[1,0])]).reshape(2,1)
-
-        
-        for i in range(ranges.shape[1]):
-
-            vals = np.asarray([ranges[0,i]*-np.cos(ranges[1,i]), ranges[0,i]*-np.sin(ranges[1,i])])
-
-            xyz_laser = np.hstack((xyz_laser,vals.reshape(2,1)))
-
-
-        print(xyz_laser.shape)
-
-
-        self.pc_laser = lp.projectLaser(scan_data)
-
-
-        self.pc_for_rows()
-
+    
     def find_centres(self, xyz):
 
-        cluster = []
+        cluster = np.asarray(xyz[:,0])
+        cluster.reshape((-1,1))
 
-        for i in range(1,xyz.shape[1]):
-
-            cluster = xyz[:,0]
+        for i in range(1,xyz.shape[1]):            
 
             if np.linalg.norm([xyz[0,i] - xyz[0,i-1], xyz[1,i] - xyz[1,i-1]]) < self.cluster_threshold:
-                cluster.append(xyz[:,i])
+                cluster = np.hstack((cluster, xyz[:,i]))
             
-            else:                
-
+            else:
                 #Check if number of points in already collected cluster are > 3, if not continue 
-
                 if len(cluster) < 3:
                     continue
 
                 #If there are > 3 points, compute centroid and add to centroid collection
                 elif len(cluster) < self.cluster_max_points:
 
-                    
                     #Best fit arc and corresponding cetroid
-
+                    self.centriods.append(find_centroids(cluster))
+                    
                 #Restart cluster with current point
-            
+                cluster = np.asarray(xyz[:,i])
+                cluster.reshape((-1,1))
+
         if self.centroids == []:
             print("No centroids found!")
 
-        
-
-            
-
-            
-
-            
-
-
-    def pc_for_rows(self):
-
-        xyz_points_in_laser = rnp.point_cloud2.pointcloud2_to_xyz_array(self.pc_laser)
-
-        laser_to_base_link_tf = hm.get_p1_to_p2_matrix("laser", "base_link", self.tf2_buffer)
-
-        print(len(xyz_points_in_laser))
-
-        print(xyz_points_in_laser)
-
-
     def main(self):
         hm.HelloNode.main(self,'navigation_scratch_pad', 'navigation', wait_for_first_pointcloud=False)
+
+def find_centroids(cluster):
+
+    x = cluster[0,:]
+    y = cluster[1,:]
+
+    x_m = np.average(x)
+    y_m = np.average(y)
+
+    center_estimate = x_m, y_m
+    center_2, ier = optimize.leastsq(f_2, center_estimate, args=(cluster))
+
+    xc_2, yc_2 = center_2
+    Ri_2       = calc_R(*center_2, cluster)
+    R_2        = Ri_2.mean()
+    residu_2   = sum((Ri_2 - R_2)**2)
+
+    return xc_2, yc_2
+
+
+def calc_R(xc, yc, cluster):
+    """ calculate the distance of each 2D points from the center (xc, yc) """
+    x = cluster[0,:]
+    y = cluster[1,:]
+    return np.sqrt((x-xc)**2 + (y-yc)**2)
+
+
+def f_2(c, cluster):
+    """ calculate the algebraic distance between the data points and the mean circle centered at c=(xc, yc) """
+    Ri = calc_R(*c, cluster)
+    print(Ri - Ri.mean())
+    return Ri - Ri.mean()
 
 
 if __name__ == '__main__':
