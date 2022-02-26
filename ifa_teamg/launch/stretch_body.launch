@@ -1,0 +1,5 @@
+<launch>
+
+  <param name="robot_description" textfile="$(find stretch_description)/urdf/stretch.urdf" />
+    
+</launch>
