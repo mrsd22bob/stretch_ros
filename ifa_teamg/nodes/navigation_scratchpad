@@ -10,8 +10,11 @@ from trajectory_msgs.msg import JointTrajectoryPoint
 import hello_helpers.hello_misc as hm
 import math
 import ros_numpy as rnp
+import numpy as np
 
 import laser_geometry.laser_geometry as lg
+
+import matplotlib.pyplot as plt
 
 lp = lg.LaserProjection()
 
@@ -32,11 +35,13 @@ class Robot(hm.HelloNode):
 
         self.pc_baselink = None
 
+        self.cluster_threshold = 0.02
+
         #Publisher for the entire point cloud represented in base_link frame
-        self.baselink_pc_pub = rospy.Publisher("/laser_in_base", PointCloud2, queue_size=1)
+        # self.baselink_pc_pub = rospy.Publisher("/pc_in_laser", PointCloud2, queue_size=1)
 
         #Publisher for the point cloud represented in base_link frame cropped to the relevant view window to the right of the robot
-        self.baselink_pc_pub_vw = rospy.Publisher("/laser_in_base", PointCloud2, queue_size=1)
+        # self.baselink_pc_pub_vw = rospy.Publisher("/laser_in_base", PointCloud2, queue_size=1)
 
     #def display_test_stats():
 
@@ -54,19 +59,58 @@ class Robot(hm.HelloNode):
 
     def process_lidar(self, scan_data):
 
-        # print(scan_data.header.frame_id)
+        ranges = np.asarray(scan_data.ranges)
 
-        print(len(scan_data.ranges))
+        print(ranges[0])
 
-        # print(scan_data.ranges[0])
-        # print(scan_data.ranges[179])
-        # print(scan_data.ranges[359])
-        # print(scan_data.ranges[539])
-        # print(scan_data.ranges[719])
+        thetas = np.asarray([i*0.00872665 for i in range(0,720,1)])
+
+        print(ranges.reshape(1,-1).shape)
+
+        print(thetas.reshape(1,-1).shape)
+
+
+        ranges = np.vstack((ranges.reshape(1,-1),thetas.reshape(1,-1)))
+
+        print(ranges.shape)
+
+        # print(np.where((ranges[0,:] < 12) & (ranges[0,:] > 0)))
+
+        cols = np.where((ranges[0,:] < 12) & (ranges[0,:] > 0))
+
+
+
+
+        xyz_laser = np.asarray([ranges[0,0]*-np.cos(ranges[1,0]), ranges[0,0]*-np.sin(ranges[1,0])]).reshape(2,1)
+
+        
+        for i in range(ranges.shape[1]):
+
+            vals = np.asarray([ranges[0,i]*-np.cos(ranges[1,i]), ranges[0,i]*-np.sin(ranges[1,i])])
+
+            xyz_laser = np.hstack((xyz_laser,vals.reshape(2,1)))
+
+
+        print(xyz_laser.shape)
+
 
         self.pc_laser = lp.projectLaser(scan_data)
 
+
         self.pc_for_rows()
+
+    def find_centres(self, xyz):
+
+        cluster = []
+
+        for i in range(1,xyz.shape[1]):
+
+            cluster = xyz[:,0]
+
+            if np.linalg.norm([xyz[0,i] - xyz[0,i-1], xyz[1,i] - xyz[1,i-1]]) < self.cluster_threshold:
+                cluster.append(xyz[:,i])
+
+            
 
 
     def pc_for_rows(self):
@@ -75,7 +119,9 @@ class Robot(hm.HelloNode):
 
         laser_to_base_link_tf = hm.get_p1_to_p2_matrix("laser", "base_link", self.tf2_buffer)
 
-        print(laser_to_base_link_tf)
+        print(len(xyz_points_in_laser))
+
+        print(xyz_points_in_laser)
 
 
     def main(self):
