@@ -69,6 +69,18 @@
             min_z: -10
             max_z: 10
 
+        - name: box5
+          type: laser_filters/LaserScanBoxFilter
+          params:
+            box_frame: base_link
+            min_x: -0.15
+            max_x: -0.03
+            min_y: 0
+            max_y: 0.2
+            min_z: -10
+            max_z: 10
+
+
         - name: shadows
           type: laser_filters/ScanShadowsFilter
           params:
@@ -76,6 +88,8 @@
             max_angle: 170
             neighbors: 20
             window: 1
+
+
 
 
 

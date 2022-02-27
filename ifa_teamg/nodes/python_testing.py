@@ -4,15 +4,15 @@ from scipy import optimize
 import numpy as np
 
 
-x = np.asarray([0, 1, 0]).reshape((1,-1))
+x = np.asarray([0, 1, 0, -1]).reshape((1,-1))
 
-y = np.asarray([-1, 0, 1]).reshape((1,-1))
+y = np.asarray([-1, 0, 1, 0.2]).reshape((1,-1))
 
-z = np.asarray([0, 0, 0]).reshape((1,-1))
+z = np.asarray([0, 0, 0, 0]).reshape((1,-1))
 
 cluster = np.vstack((x,y,z))
 
-print(cluster[0,:])
+# print(cluster[0,:])
 
 print(cluster.shape)
 
@@ -29,7 +29,7 @@ def find_centroids(cluster):
     center_2, ier = optimize.leastsq(f_2, center_estimate, args=(cluster))
 
     xc_2, yc_2 = center_2
-    Ri_2       = calc_R(*center_2, cluster)
+    Ri_2       = calc_R(*center_2, cluster = cluster)
     R_2        = Ri_2.mean()
     residu_2   = sum((Ri_2 - R_2)**2)
 
@@ -47,7 +47,7 @@ def calc_R(xc, yc, cluster):
 
 def f_2(c, cluster):
     """ calculate the algebraic distance between the data points and the mean circle centered at c=(xc, yc) """
-    Ri = calc_R(*c, cluster)
+    Ri = calc_R(*c, cluster = cluster)
     print(Ri - Ri.mean())
     return Ri - Ri.mean()
 
