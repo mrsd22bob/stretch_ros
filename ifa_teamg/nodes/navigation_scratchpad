@@ -1,11 +1,15 @@
 #!/usr/bin/env python
 
 from re import X
+
+from cv2 import line
 import rospy
 from std_srvs.srv import Trigger, TriggerRequest
 from sensor_msgs.msg import JointState, PointCloud2, LaserScan
 from control_msgs.msg import FollowJointTrajectoryGoal
 from trajectory_msgs.msg import JointTrajectoryPoint
+from nav_msgs.msg import Odometry
+from geometry_msgs.msg import Twist
 
 from scipy import optimize
 
@@ -45,6 +49,16 @@ class Robot(hm.HelloNode):
 
         self.pot_radius_max_threshold = 0.20
 
+        self.pot_spacing = 0.5
+
+        self.waypoints = []
+
+        self.twist_msg = Twist()
+
+        #Velocity Publisher for the base
+        self.velocity_pub = rospy.Publisher("/stretch/cmd_vel", Twist, queue_size=1)
+
+
         #Publisher for the entire point cloud represented in base_link frame
         # self.baselink_pc_pub = rospy.Publisher("/pc_in_laser", PointCloud2, queue_size=1)
 
@@ -70,25 +84,24 @@ class Robot(hm.HelloNode):
         # print(pc_baselink_box.header.frame_id)
         xyz = rnp.point_cloud2.pointcloud2_to_xyz_array(pc_baselink_box).T
 
-        print(xyz.shape)
+        # print(xyz.shape)
 
         index_to_keep_x = np.where((xyz[0,:] > 0))
         xyz_selfx = xyz[:,index_to_keep_x].reshape(3,-1)
 
-        print(xyz_selfx.shape)
+        # print(xyz_selfx.shape)
         self.find_centers(xyz_selfx)
+
+    def odom_update(self, odom_feedback):
+
+        self.x_current = odom_feedback.pose.pose.position.x
+        self.y_current = odom_feedback.pose.pose.position.y
 
     
     def find_centers(self, xyz):
 
         cluster = np.asarray(xyz[:,0])
         cluster = cluster.reshape((-1,1))
-
-        
-
-        print(cluster.shape)
-
-        print(xyz)
 
         for i in range(1,xyz.shape[1]):   
    
@@ -116,18 +129,86 @@ class Robot(hm.HelloNode):
                     #Best fit arc and corresponding cetroid
                     [cent_x, cent_y, R_xy] = find_centroids(cluster)
 
-                    print(R_xy)
+                    # print(R_xy)
 
                     if R_xy < self.pot_radius_max_threshold:
                         print("Centroid received is: ", [cent_x, cent_y])
-                        self.centroids.append(find_centroids(cluster))
+
+                        if len(self.centroids) == 0:
+                            self.centroids.append(find_centroids(cluster))
+                            self.waypoints = np.asarray([[cent_x], [cent_y-0.2]])
+                        elif np.linalg.norm([self.centroids[-1][0] - cent_x, self.centroids[-1][1] - cent_y]) > self.pot_spacing:
+                            self.centroids.append(find_centroids(cluster))
+                            self.waypoints = np.hstack((self.waypoints, np.asarray([[cent_x],[cent_y-0.2]])))
+
+                        print(self.waypoints)
+
+                        print("Waypoints added succesfully")
+
+                        self.trajectory_tracker()
                     
                 #Restart cluster with current point
                 cluster = np.asarray(xyz[:,i])
                 cluster = cluster.reshape((-1,1))
 
+                
+
         if self.centroids == []:
             print("No centroids found!")
+
+        
+    def trajectory_tracker(self):
+
+        if self.centroids == []:
+            rospy.loginfo("No waypoints detected yet.")
+
+            print("No waypoints detected yet.")
+
+        else:
+
+            print("In velocity command")
+
+            print(self.x_current)
+
+            print(self.waypoints[0,-1])
+
+            transform_base_to_odom = hm.get_p1_to_p2_matrix("base_link", "odom", self.tf2_buffer)[0]
+
+            wp_vec = np.asarray([self.waypoints[0,-1],0,0,1])
+
+            print(transform_base_to_odom.shape)
+
+            print(transform_base_to_odom)
+
+            x_in_odom = np.matmul(transform_base_to_odom,np.asarray([self.waypoints[0,-1],0,0,1]))
+            x_in_odom = x_in_odom[0]
+
+            if self.x_current < x_in_odom:
+
+                self.twist_msg.linear.x = 0.1
+                self.twist_msg.linear.y = 0
+                self.twist_msg.linear.z = 0
+
+                self.twist_msg.angular.x = 0
+                self.twist_msg.angular.y = 0
+                self.twist_msg.angular.z = 0
+
+                self.velocity_pub.publish(self.twist_msg)
+
+            elif self.x_current > x_in_odom:
+
+                self.twist_msg.linear.x = 0
+                self.twist_msg.linear.y = 0
+                self.twist_msg.linear.z = 0
+
+                self.twist_msg.angular.x = 0
+                self.twist_msg.angular.y = 0
+                self.twist_msg.angular.z = 0
+
+                self.velocity_pub.publish(self.twist_msg)
+
+
+        
 
         
 
@@ -174,6 +255,8 @@ if __name__ == '__main__':
         node.main()
 
         lidar_subscriber = rospy.Subscriber('/laser_cloud_baselink', PointCloud2, node.process_cloud)
+
+        odom_subscriber = rospy.Subscriber('/odom', Odometry, node.odom_update)
 
         rospy.spin()
 
