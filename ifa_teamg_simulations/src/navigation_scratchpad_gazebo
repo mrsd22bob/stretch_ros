@@ -10,7 +10,8 @@ from control_msgs.msg import FollowJointTrajectoryGoal
 from trajectory_msgs.msg import JointTrajectoryPoint
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Twist
-from move_base_msgs.msg import MoveBaseActionGoal
+
+import tf2_ros
 
 from scipy import optimize
 
@@ -26,19 +27,14 @@ import matplotlib.pyplot as plt
 lp = lg.LaserProjection()
 
 
-class Robot(hm.HelloNode):
+class Robot():
 
     def __init__(self):
-        hm.HelloNode.__init__(self)
 
         self.rate = 10.0
 
         self.square_side = 3.5
         self.rotation_angle = -math.pi/2  # In radians
-        self.mode = 'position'
-        self.straight_command = {'joint': 'translate_mobile_base', 'inc': self.square_side}
-        self.cw_command = {'joint': 'rotate_mobile_base', 'inc': -self.rotation_angle}
-        self.ccw_command = {'joint': 'rotate_mobile_base', 'inc': self.rotation_angle}
 
         self.pc_baselink = None
 
@@ -57,10 +53,7 @@ class Robot(hm.HelloNode):
         self.twist_msg = Twist()
 
         #Velocity Publisher for the base
-        self.velocity_pub = rospy.Publisher("/stretch/cmd_vel", Twist, queue_size=1)
-
-        #Move Base goal publisher
-        self.move_base_goal_pub = rospy.Publisher("move_base/goal", MoveBaseActionGoal, queue_size=1)
+        self.velocity_pub = rospy.Publisher("/stretch_diff_drive_controller/cmd_vel", Twist, queue_size=1)
 
 
         #Publisher for the entire point cloud represented in base_link frame
@@ -217,7 +210,12 @@ class Robot(hm.HelloNode):
         
 
     def main(self):
-        hm.HelloNode.main(self,'navigation_scratch_pad', 'navigation', wait_for_first_pointcloud=False)
+        
+        self.node = rospy.init_node('nav_sim_node', anonymous=True)
+
+        self.tf2_buffer = tf2_ros.Buffer()
+        
+        self.tf2_listener = tf2_ros.TransformListener(self.tf2_buffer)
 
 def find_centroids(cluster):
 
@@ -256,11 +254,12 @@ if __name__ == '__main__':
 
     try:
         node = Robot()
+        
         node.main()
 
         lidar_subscriber = rospy.Subscriber('/laser_cloud_baselink', PointCloud2, node.process_cloud)
 
-        odom_subscriber = rospy.Subscriber('/odom', Odometry, node.odom_update)
+        odom_subscriber = rospy.Subscriber('/stretch_diff_drive_controller/odom', Odometry, node.odom_update)
 
         rospy.spin()
 
