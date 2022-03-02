@@ -52,8 +52,8 @@ if __name__ == '__main__':
 
     try:
         node = Manipulation_t1()
-	node.main()
-	node.begin_test()
+		node.main()
+		node.begin_test()
 	
     except KeyboardInterrupt:
         rospy.loginfo('interrupt received bro!!! Gotcha!')
