@@ -60,7 +60,7 @@ class Robot(hm.HelloNode):
 
         self.waypoints = []
 
-        self.safe_dist = 0.35
+        self.safe_dist = 0.4
 
         
 
