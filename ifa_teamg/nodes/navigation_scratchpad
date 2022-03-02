@@ -177,7 +177,7 @@ class Robot(hm.HelloNode):
                             transform_base_to_odom = hm.get_p1_to_p2_matrix("base_link", "odom", self.tf2_buffer)[0]
                             goal_vec_odom = np.asarray([[self.waypoints[0,0]], [self.waypoints[1,0] + self.safe_dist], [0], [1]])
                             goal_loc =  np.matmul(transform_base_to_odom, goal_vec_odom)
-                            goal_orientation = np.arctan2(self.waypoints[0,0] - self.x_current, goal_vec_odom[1,0] - self.y_current)
+                            goal_orientation = np.arctan2(goal_vec_odom[1,0] - self.y_current, self.waypoints[0,0] - self.x_current)
 
                             move_tuple = (goal_loc[0], goal_loc[1], goal_orientation)
 
@@ -194,7 +194,7 @@ class Robot(hm.HelloNode):
 
                             #create goal tuple to send to move_base_call
                             transform_base_to_odom = hm.get_p1_to_p2_matrix("base_link", "odom", self.tf2_buffer)[0]
-                            goal_orientation = np.arctan2(self.waypoints[0,-1] - self.waypoints[0,-2], self.waypoints[1,-1] - self.waypoints[1,-2])
+                            goal_orientation = np.arctan2(self.waypoints[1,-1] - self.waypoints[1,-2], self.waypoints[0,-1] - self.waypoints[0,-2])
 
 
                             goal_vec_odom = np.asarray([[self.waypoints[0,0] + self.safe_dist*np.cos(goal_orientation + np.pi/2)], [self.waypoints[1,0] + self.safe_dist*np.sin(goal_orientation + np.pi/2)], [0], [1]])
@@ -283,6 +283,12 @@ class Robot(hm.HelloNode):
 
         quaternion = quaternion_from_euler(0, 0, goal[2])
 
+        print("Quaternion: ", quaternion)
+
+        quaternion_norm = quaternion/np.linalg.norm(quaternion)
+
+        # print("Quaternion: ", quaternion_norm[2], quaternion_norm[3])
+
         ###############################Create Goal Message##########################
 
         #Setting Header Parameters
@@ -322,10 +328,10 @@ class Robot(hm.HelloNode):
         self.move_msg_simple.pose.position.z = 0
 
         #Setting Goal Quaternion
-        self.move_msg_simple.pose.orientation.x = quaternion[0]
-        self.move_msg_simple.pose.orientation.y = quaternion[1]
-        self.move_msg_simple.pose.orientation.z = quaternion[2]
-        self.move_msg_simple.pose.orientation.z = quaternion[3]
+        self.move_msg_simple.pose.orientation.x = quaternion_norm[0]
+        self.move_msg_simple.pose.orientation.y = quaternion_norm[1]
+        self.move_msg_simple.pose.orientation.z = quaternion_norm[2]
+        self.move_msg_simple.pose.orientation.w = quaternion_norm[3]
 
 
 

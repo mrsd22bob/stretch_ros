@@ -8,7 +8,7 @@
   <!-- -->
     
   <!-- SQUARE PATH TESTING LAUNCH -->
-  <node name="navigation_scratchpad" pkg="ifa_teamg" type="navigation_scratchpad" output="log" args=''/>
+  <node name="navigation_scratchpad" pkg="ifa_teamg" type="navigation_scratchpad" output="screen" args=''/>
   <!-- -->
 
   <!-- RPLIDAR A1 -->
@@ -109,7 +109,7 @@
     <rosparam file="$(find ifa_teamg)/config/common_costmap_params.yaml" command="load" ns="global_costmap" />
     <rosparam file="$(find ifa_teamg)/config/common_costmap_params.yaml" command="load" ns="local_costmap" />
     <rosparam file="$(find ifa_teamg)/config/local_costmap_params.yaml" command="load" />
-    <rosparam file="$(find ifa_teamg)/config/global_costmap_params_withmap.yaml" command="load" />
+    <rosparam file="$(find ifa_teamg)/config/global_costmap_params_nomap.yaml" command="load" />
     <rosparam file="$(find ifa_teamg)/config/base_local_planner_params.yaml" command="load" />
     <remap from="/cmd_vel" to="/stretch/cmd_vel" />
   </node>

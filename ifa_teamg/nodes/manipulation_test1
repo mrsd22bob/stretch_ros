@@ -1,59 +1,84 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
+
+import actionlib
 import rospy
-from std_srvs.srv import Trigger, TriggerRequest
-from sensor_msgs.msg import JointState
-from control_msgs.msg import FollowJointTrajectoryGoal
-from trajectory_msgs.msg import JointTrajectoryPoint
-
-
-import hello_helpers.hello_misc as hm
 import math
 
+from std_srvs.srv import Trigger, TriggerRequest, TriggerResponse
+from sensor_msgs.msg import JointState
+from control_msgs.msg import FollowJointTrajectoryAction
+from control_msgs.msg import FollowJointTrajectoryGoal
+from trajectory_msgs.msg import JointTrajectoryPoint
+from geometry_msgs.msg import Twist
+
+import numpy as np
+import stretch_funmap.manipulation_planning as mp
+import hello_helpers.hello_misc as hm
 
 class Manipulation_t1(hm.HelloNode):
 
-    def __init__(self):
-        hm.HelloNode.__init__(self)
+	def __init__(self):
+		hm.HelloNode.__init__(self)
 
-	self.rate = 7.0
-	
+		self.rate = 7.0
+		self.desired_z = np.array([0.8,   0.4,  1.0,  0.9,  0.1,  0.5,  0.7,  0.4, 0.3,  0.7])
+		self.desired_y = np.array([0.35,   0.35,  0.35,  0.35,  0.35,  0.35,  0.35,  0.35, 0.35,  0.35])
+		self.extend_y = {'wrist_extension' : 0.1}
+		self.retract_y = {'wrist_extension' : 0.0}
+		
+		# self.straight_command = {'joint': 'translate_mobile_base', 'inc': self.square_side}
 
-	self.random_p1 = {'wrist_extension':2.0, 'joint_lift': 2.0}	#44.5in, 30in
-	self.random_p2 = {'wrist_extension':0.0, 'joint_lift': 0.0}    #4.5in, 10in
+	# def joint_states_callback(self, joint_states):
+	# 	with self.joint_states_lock: 
+	# 		self.joint_states = joint_states
+	# 	wrist_position, wrist_velocity, wrist_effort = hm.get_wrist_state(joint_states)
+	# 	self.wrist_position = wrist_position
+	# 	lift_position, lift_velocity, lift_effort = hm.get_lift_state(joint_states)
+	# 	self.lift_position = lift_position
 
 
-	
-      
+	# def simple_IK(self, goal_point, trajectory_goal):
 
-    def command_random(self):
+	# 	# joint_name = self.inverse_kinematics['joint']
+	# 	trajectory_goal.trajectory.joint_names = [joint_name]
 
-	
-	self.move_to_pose(self.random_p1)
+	# 	goal_point.positions = [self.inverse_kinematics['inc']]
+	# 	trajectory_goal.trajectory.points = [goal_point]
+	# 	trajectory_goal.trajectory.header.stamp = rospy.Time.now()
 
-	self.trajectory_client.wait_for_result()
+	# 	self.trajectory_client.send_goal(trajectory_goal)
+	# 	self.trajectory_client.wait_for_result()	
 
-	self.move_to_pose(self.random_p2)
 
-	self.trajectory_client.wait_for_result()
-	
-	
+	def begin_simple_test(self):
 
-    def begin_test(self):
+		for i in range(len(self.desired_z)):
+			pose = {'wrist_extension' : self.desired_y[i] - 0.1, 'joint_lift' : self.desired_z[i]}
+			self.move_to_pose(pose)
+			self.trajectory_client.wait_for_result()
+			self.move_to_pose(self.extend_y)
+			self.trajectory_client.wait_for_result()
+			self.move_to_pose(self.retract_y)
+			self.trajectory_client.wait_for_result()
 
-	rate = rospy.Rate(self.rate)
-	self.command_random()
-	
 
-    def main(self):
-	hm.HelloNode.main(self,'manipulation_test1', 'manipulation_test1', wait_for_first_pointcloud=False)
+	def main(self):
+		hm.HelloNode.main(self,'manipulation_test1', 'manipulation_test1', wait_for_first_pointcloud=False)
+		# self.joint_states_subscriber = rospy.Subscriber('/stretch/joint_states', JointState, self.joint_states_callback)
+		rate = rospy.Rate(self.rate)
+		while not rospy.is_shutdown():
+			self.begin_simple_test()
+			rate.sleep()
+
 
 if __name__ == '__main__':
 
-    try:
-        node = Manipulation_t1()
+	try:
+		node = Manipulation_t1()
 		node.main()
-		node.begin_test()
+		
 	
-    except KeyboardInterrupt:
-        rospy.loginfo('interrupt received bro!!! Gotcha!')
+	except KeyboardInterrupt:
+		rospy.loginfo('interrupt received, so shutting down')
