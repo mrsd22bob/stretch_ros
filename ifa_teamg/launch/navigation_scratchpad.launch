@@ -12,7 +12,7 @@
   <!-- -->
 
   <!-- RPLIDAR A1 -->
-  <node name="lidar_node" pkg="rplidar_ros" type="rplidarNode" output="screen">
+  <node name="lidar_node" pkg="rplidar_ros" type="rplidarNode" output="log">
     <param name="serial_port"         type="string" value="/dev/hello-lrf"/>
     <param name="serial_baudrate"     type="int"    value="115200"/> 
     <param name="frame_id"            type="string" value="laser"/>
@@ -109,7 +109,7 @@
     <rosparam file="$(find ifa_teamg)/config/common_costmap_params.yaml" command="load" ns="global_costmap" />
     <rosparam file="$(find ifa_teamg)/config/common_costmap_params.yaml" command="load" ns="local_costmap" />
     <rosparam file="$(find ifa_teamg)/config/local_costmap_params.yaml" command="load" />
-    <rosparam file="$(find ifa_teamg)/config/global_costmap_params_withmap.yaml" command="load" />
+    <rosparam file="$(find ifa_teamg)/config/global_costmap_params_nomap.yaml" command="load" />
     <rosparam file="$(find ifa_teamg)/config/base_local_planner_params.yaml" command="load" />
     <remap from="/cmd_vel" to="/stretch/cmd_vel" />
   </node>
