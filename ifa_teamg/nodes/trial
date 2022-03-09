@@ -1,0 +1,74 @@
+#!/usr/bin/env python
+
+import rospy
+from std_srvs.srv import Trigger, TriggerRequest
+from sensor_msgs.msg import JointState
+from control_msgs.msg import FollowJointTrajectoryGoal
+from trajectory_msgs.msg import JointTrajectoryPoint
+from geometry_msgs.msg import PoseStamped
+
+import hello_helpers.hello_misc as hm
+import math
+
+
+
+# therobot.move_to_pose(pose-dictionary)
+
+command = {'joint': 'translate_mobile_base', 'inc': 0.0}
+
+
+def respondToMarker(poseS):    
+
+
+    #Create motion command
+    global command
+    
+    command = {'joint': 'translate_mobile_base', 'inc': poseS.pose.position.x}
+    
+
+    #command movement
+
+    print(poseS.pose.position.x)
+
+
+
+if __name__ == '__main__':
+
+    try:
+
+        the_robot = hm.HelloNode()
+
+        the_robot.main('hack_nav', 'hack_nav', wait_for_first_pointcloud=False)
+
+
+
+    # rospy.init_node('listener', anonymous=True)
+    # rospy.Subscriber("chatter", String, callback)
+
+        # rospy.init_node("nav_hackathon", anonymous=True)
+        rospy.Subscriber("/aruco_single/pose", PoseStamped, respondToMarker)
+        rate = rospy.Rate(10)
+
+        trajectory_goal = FollowJointTrajectoryGoal()
+
+
+        goal_point = JointTrajectoryPoint()
+
+        # rospy.spin()
+
+        while not rospy.is_shutdown():
+            joint_name = command['joint']
+            trajectory_goal.trajectory.joint_names = [joint_name]
+
+            goal_point.positions = [command['inc']]
+            trajectory_goal.trajectory.points = [goal_point]
+            trajectory_goal.trajectory.header.stamp = rospy.Time.now()
+            the_robot.trajectory_client.send_goal(trajectory_goal)
+
+            the_robot.trajectory_client.wait_for_result()
+
+
+            rate.sleep()
+
+    except KeyboardInterrupt:
+        rospy.loginfo('interrupt received bro!!! Gotcha!')

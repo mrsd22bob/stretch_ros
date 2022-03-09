@@ -19,7 +19,7 @@ class Manipulation_t1(hm.HelloNode):
 	self.rate = 7.0
 	
 
-	self.random_p1 = {'wrist_extension':2.0, 'joint_lift': 2.0}	#44.5in, 30in
+	#self.random_p1 = {'wrist_extension':2.0, 'joint_lift': 2.0}	#44.5in, 30in
 	self.random_p2 = {'wrist_extension':0.0, 'joint_lift': 0.0}    #4.5in, 10in
 
 
@@ -29,9 +29,9 @@ class Manipulation_t1(hm.HelloNode):
     def command_random(self):
 
 	
-	self.move_to_pose(self.random_p1)
+	#self.move_to_pose(self.random_p1)
 
-	self.trajectory_client.wait_for_result()
+	#self.trajectory_client.wait_for_result()
 
 	self.move_to_pose(self.random_p2)
 
