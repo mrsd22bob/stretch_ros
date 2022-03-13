@@ -124,5 +124,9 @@
       Boost: max_distance: 12.0 m, Point number: 8.0K"
   -->
 
+
+  <!-- VISUALIZE -->
+  <node name="rviz" pkg="rviz" type="rviz" output="log" args="-d $(find ifa_teamg)/rviz/navigation.rviz" if="$(arg rviz)" />
+
 </launch>
 

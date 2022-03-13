@@ -51,9 +51,9 @@ class Manipulation_t1(hm.HelloNode):
 if __name__ == '__main__':
 
     try:
-        node = Manipulation_t1()
-		node.main()
-		node.begin_test()
+	node = Manipulation_t1()
+	node.main()
+	node.begin_test()
 	
     except KeyboardInterrupt:
         rospy.loginfo('interrupt received bro!!! Gotcha!')
