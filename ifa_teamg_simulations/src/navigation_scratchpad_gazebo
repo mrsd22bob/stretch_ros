@@ -9,17 +9,9 @@ from sensor_msgs.msg import JointState, PointCloud2, LaserScan
 from control_msgs.msg import FollowJointTrajectoryGoal
 from trajectory_msgs.msg import JointTrajectoryPoint
 from nav_msgs.msg import Odometry
-<<<<<<< HEAD
-from geometry_msgs.msg import Twist, PoseStamped
-
-from move_base_msgs.msg import MoveBaseActionGoal
-
-#for quaternion tranformation from Euler to Quaternion
-from tf.transformations import quaternion_from_euler
-=======
 from geometry_msgs.msg import Twist
-from move_base_msgs.msg import MoveBaseActionGoal
->>>>>>> c0c82179b96779cd8068889092fa84e68157130e
+
+import tf2_ros
 
 from scipy import optimize
 
@@ -35,19 +27,14 @@ import matplotlib.pyplot as plt
 lp = lg.LaserProjection()
 
 
-class Robot(hm.HelloNode):
+class Robot():
 
     def __init__(self):
-        hm.HelloNode.__init__(self)
 
         self.rate = 10.0
 
         self.square_side = 3.5
         self.rotation_angle = -math.pi/2  # In radians
-        self.mode = 'position'
-        self.straight_command = {'joint': 'translate_mobile_base', 'inc': self.square_side}
-        self.cw_command = {'joint': 'rotate_mobile_base', 'inc': -self.rotation_angle}
-        self.ccw_command = {'joint': 'rotate_mobile_base', 'inc': self.rotation_angle}
 
         self.pc_baselink = None
 
@@ -59,40 +46,14 @@ class Robot(hm.HelloNode):
 
         self.pot_radius_max_threshold = 0.20
 
-        self.pot_radius_min_threshold = 0.05
-
         self.pot_spacing = 0.5
 
         self.waypoints = []
 
-        self.safe_dist = 0.35
-
-        
-
-
-        #Using the twist for rudimentary motion implementation without using move_base
         self.twist_msg = Twist()
 
-        #Using MoveBaseActionGoal for motion implementation using move_base
-        self.move_msg = MoveBaseActionGoal()
-        self.move_msg_count = 0
-
-        self.move_msg_simple = PoseStamped()
-        self.move_msg_count = 0
-
         #Velocity Publisher for the base
-        self.velocity_pub = rospy.Publisher("/stretch/cmd_vel", Twist, queue_size=1)
-
-<<<<<<< HEAD
-        #Move-base Publisher for the base
-        # self.move_base_goal_pub = rospy.Publisher("move_base/goal", MoveBaseActionGoal, queue_size=1)
-
-        #Move-base Simple Goal Publisher for the base
-        self.move_base_simple_goal_pub = rospy.Publisher("/move_base_simple/goal", PoseStamped, queue_size=1)
-=======
-        #Move Base goal publisher
-        self.move_base_goal_pub = rospy.Publisher("move_base/goal", MoveBaseActionGoal, queue_size=1)
->>>>>>> c0c82179b96779cd8068889092fa84e68157130e
+        self.velocity_pub = rospy.Publisher("/stretch_diff_drive_controller/cmd_vel", Twist, queue_size=1)
 
 
         #Publisher for the entire point cloud represented in base_link frame
@@ -136,13 +97,6 @@ class Robot(hm.HelloNode):
     
     def find_centers(self, xyz):
 
-        # print(xyz.shape)
-
-        # print(xyz)
-
-        if xyz.shape[1] == 0:
-            return 0
-
         cluster = np.asarray(xyz[:,0])
         cluster = cluster.reshape((-1,1))
 
@@ -174,53 +128,21 @@ class Robot(hm.HelloNode):
 
                     # print(R_xy)
 
-                    if R_xy < self.pot_radius_max_threshold and R_xy > self.pot_radius_min_threshold:
-                        # print("Centroid received is: ", [cent_x, cent_y])
+                    if R_xy < self.pot_radius_max_threshold:
+                        print("Centroid received is: ", [cent_x, cent_y])
 
                         if len(self.centroids) == 0:
-                            self.centroids.append([cent_x, cent_y, R_xy])
-
-                            #Adding waypoints in the odometry frame
-                            self.waypoints = np.asarray([[cent_x], [cent_y]])
-
-                            #create goal tuple to send to move_base_call
-                            transform_base_to_odom = hm.get_p1_to_p2_matrix("base_link", "odom", self.tf2_buffer)[0]
-                            goal_vec_odom = np.asarray([[self.waypoints[0,0]], [self.waypoints[1,0] + self.safe_dist], [0], [1]])
-                            goal_loc =  np.matmul(transform_base_to_odom, goal_vec_odom)
-                            goal_orientation = np.arctan2(goal_vec_odom[1,0] - self.y_current, self.waypoints[0,0] - self.x_current)
-
-                            move_tuple = (goal_loc[0], goal_loc[1], goal_orientation)
-
-                            print("Initiating Call to Move Base")
-
-                            self.move_base(move_tuple)
-
-
+                            self.centroids.append(find_centroids(cluster))
+                            self.waypoints = np.asarray([[cent_x], [cent_y-0.2]])
                         elif np.linalg.norm([self.centroids[-1][0] - cent_x, self.centroids[-1][1] - cent_y]) > self.pot_spacing:
-                            self.centroids.append([cent_x, cent_y, R_xy])
-
-                            #Adding waypoints in the odometry frame
-                            self.waypoints = np.hstack((self.waypoints, np.asarray([[cent_x],[cent_y]])))
-
-                            #create goal tuple to send to move_base_call
-                            transform_base_to_odom = hm.get_p1_to_p2_matrix("base_link", "odom", self.tf2_buffer)[0]
-                            goal_orientation = np.arctan2(self.waypoints[1,-1] - self.waypoints[1,-2], self.waypoints[0,-1] - self.waypoints[0,-2])
-
-
-                            goal_vec_odom = np.asarray([[self.waypoints[0,0] + self.safe_dist*np.cos(goal_orientation + np.pi/2)], [self.waypoints[1,0] + self.safe_dist*np.sin(goal_orientation + np.pi/2)], [0], [1]])
-                            goal_loc =  np.matmul(transform_base_to_odom, goal_vec_odom)
-
-                            move_tuple = (goal_loc[0], goal_loc[1], goal_orientation)
-
-                            print("Initiating Call to Move Base")
-
-                            self.move_base(move_tuple)
-
-                            
+                            self.centroids.append(find_centroids(cluster))
+                            self.waypoints = np.hstack((self.waypoints, np.asarray([[cent_x],[cent_y-0.2]])))
 
                         print(self.waypoints)
 
-                        # print("Waypoints added succesfully")
+                        print("Waypoints added succesfully")
+
+                        self.trajectory_tracker()
                     
                 #Restart cluster with current point
                 cluster = np.asarray(xyz[:,i])
@@ -258,8 +180,6 @@ class Robot(hm.HelloNode):
             x_in_odom = np.matmul(transform_base_to_odom,np.asarray([self.waypoints[0,-1],0,0,1]))
             x_in_odom = x_in_odom[0]
 
-            
-
             if self.x_current < x_in_odom:
 
                 self.twist_msg.linear.x = 0.1
@@ -285,67 +205,17 @@ class Robot(hm.HelloNode):
                 self.velocity_pub.publish(self.twist_msg)
 
 
-    def move_base(self, goal):
+        
 
-        print("Received Call to Move Base")
-
-        self.move_msg_count += 1
-
-        quaternion = quaternion_from_euler(0, 0, goal[2])
-
-        ###############################Create Goal Message##########################
-
-        #Setting Header Parameters
-        """self.move_msg.header.seq = self.move_msg_count
-        self.move_msg.header.stamp = rospy.Time.now()
-        self.move_msg.header.frame_id = "odom"
-
-        #Setting Goal Parameters
-        self.move_msg.goal_id.stamp = self.move_msg.header.stamp
-        self.move_msg.goal_id.id = "nav_goal_" + str(self.move_msg_count)
-
-        #Setting Goal Header Parameters
-        self.move_msg.goal.target_pose.header.seq = self.move_msg.header.seq
-        self.move_msg.goal.target_pose.header.stamp = self.move_msg.header.stamp
-        self.move_msg.goal.target_pose.header.frame_id = self.move_msg.header.frame_id
-
-        #Setting Goal x and y Positions
-        self.move_msg.goal.target_pose.pose.position.x = goal[0]
-        self.move_msg.goal.target_pose.pose.position.y = goal[1]
-        self.move_msg.goal.target_pose.pose.position.z = 0
-
-        #Setting Goal Quaternion
-        self.move_msg.goal.target_pose.pose.orientation.x = quaternion[0]
-        self.move_msg.goal.target_pose.pose.orientation.y = quaternion[1]
-        self.move_msg.goal.target_pose.pose.orientation.z = quaternion[2]
-        self.move_msg.goal.target_pose.pose.orientation.z = quaternion[3]"""
-
-
-
-        self.move_msg_simple.header.seq = self.move_msg_count
-        self.move_msg_simple.header.stamp = rospy.Time.now()
-        self.move_msg_simple.header.frame_id = "odom"
-
-        #Setting Goal x and y Positions
-        self.move_msg_simple.pose.position.x = goal[0]
-        self.move_msg_simple.pose.position.y = goal[1]
-        self.move_msg_simple.pose.position.z = 0
-
-        #Setting Goal Quaternion
-        self.move_msg_simple.pose.orientation.x = quaternion[0]
-        self.move_msg_simple.pose.orientation.y = quaternion[1]
-        self.move_msg_simple.pose.orientation.z = quaternion[2]
-        self.move_msg_simple.pose.orientation.w = quaternion[3]
-
-
-
-
-        self.move_base_simple_goal_pub.publish(self.move_msg_simple)
-
-
+        
 
     def main(self):
-        hm.HelloNode.main(self,'navigation_scratch_pad', 'navigation', wait_for_first_pointcloud=False)
+        
+        self.node = rospy.init_node('nav_sim_node', anonymous=True)
+
+        self.tf2_buffer = tf2_ros.Buffer()
+        
+        self.tf2_listener = tf2_ros.TransformListener(self.tf2_buffer)
 
 def find_centroids(cluster):
 
@@ -384,11 +254,12 @@ if __name__ == '__main__':
 
     try:
         node = Robot()
+        
         node.main()
 
         lidar_subscriber = rospy.Subscriber('/laser_cloud_baselink', PointCloud2, node.process_cloud)
 
-        odom_subscriber = rospy.Subscriber('/odom', Odometry, node.odom_update)
+        odom_subscriber = rospy.Subscriber('/stretch_diff_drive_controller/odom', Odometry, node.odom_update)
 
         rospy.spin()
 
