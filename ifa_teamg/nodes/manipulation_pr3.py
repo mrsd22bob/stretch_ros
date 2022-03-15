@@ -23,7 +23,11 @@ class Manipulation_pr3(hm.HelloNode):
 
     def moveWristToMarker(self, pose):
         
-        target_frame = 'link_arm_l4'
+	#'base_link to link_arm_l0
+	offset_y = -0.151
+	offset_z = 0.250
+        #target_frame = 'link_arm_l0'
+	target_frame = 'base_link'
 	print(pose.header.frame_id[1:])
 	
         transform = self.tf_buffer.lookup_transform(target_frame, pose.header.frame_id[1:], pose.header.stamp)
@@ -32,11 +36,13 @@ class Manipulation_pr3(hm.HelloNode):
 
         pose_transformed = tf2_geometry_msgs.do_transform_pose(pose, transform)
         #returns trans:xyz orien:xyzw
+	print(pose_transformed)
+	pose_z = pose_transformed.pose.position.z - offset_z
+	pose_y = -(pose_transformed.pose.position.y + offset_z)
 
-        pose_desired = {'wrist_extension' : pose_transformed.pose.position.y, 'joint_lift' : pose_transformed.pose.position.z}
+        pose_desired = {'joint_lift' : pose_z, 'wrist_extension' : pose_y }	
 	print(pose_desired)
-        self.move_to_pose(pose_desired)
-
+	self.move_to_pose(pose_desired)
 
     # def moveToolToMarker(poses):
     #   pass

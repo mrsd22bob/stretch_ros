@@ -3,10 +3,8 @@ global_costmap:
   robot_base_frame: base_link
   update_frequency: 5.0
   static_map: false
-<<<<<<< HEAD
   rolling_window: true
   width: 6.0
   height: 6.0
   resolution: 0.05
-=======
->>>>>>> c0c82179b96779cd8068889092fa84e68157130e
+
