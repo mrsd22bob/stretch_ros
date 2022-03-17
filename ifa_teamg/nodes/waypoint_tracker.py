@@ -113,6 +113,11 @@ class NavPlan():
         #Path Start Time Offset
         self.path_start_time_offset = rospy.Time.now()
 
+        # Creating Transform Listener
+        self.tf_listener = tf.TransformListener()
+
+        print("ROS Waypoint Tracker Node Started Successfully")
+
     def UpdateCurrentPose(self, odom_message):
 
         self.currentPose.header = odom_message.header
@@ -120,25 +125,6 @@ class NavPlan():
         self.currentPose.pose = odom_message.pose.pose
 
         # print(self.currentPose)
-
-    def TestPub(self):
-
-        rate = rospy.Rate(10)
-
-        while not rospy.is_shutdown():
-
-            self.twistMessage.linear.x += 0.1
-            self.twistMessage.linear.y = 0
-            self.twistMessage.linear.z = 0
-
-            self.twistMessage.angular.x = 0
-            self.twistMessage.angular.y -= 0.4
-            self.twistMessage.angular.z = 0
-
-            
-            self.twistPub.publish(self.twistMessage)
-
-            rate.sleep()
 
     #zeroTwist message publication when no motion is to be commanded
     def ZeroTwist(self):
@@ -204,6 +190,18 @@ class NavPlan():
 
         currentPose = self.currentPose.pose
 
+        currentTime = self.currentPose.header.stamp
+
+        self.tf_listener.waitForTransform( '/base_link', '/odom', currentTime, rospy.Duration(1))
+
+        (trans,rot) = self.tf_listener.lookupTransform('/base_link', '/odom', currentTime)
+
+        H_odom2base = tf.transformations.quaternion_matrix(rot)
+
+        H_odom2base[:3,3] = np.array(trans)
+
+        print(H_odom2base)
+
         #Homogeneous Transformation Matrix for Current Pose
         H_current = tf.transformations.quaternion_matrix([currentPose.orientation.x,currentPose.orientation.y,currentPose.orientation.z,currentPose.orientation.w])
         H_current[:,3] = np.array([currentPose.position.x, currentPose.position.y, currentPose.position.z, 1])
@@ -215,12 +213,12 @@ class NavPlan():
         x_traj = self.x_cubic_params[0]*s**3 + self.x_cubic_params[1]*s**2 + self.x_cubic_params[2]*s + self.x_cubic_params[3]
         y_traj = self.y_cubic_params[0]*s**3 + self.y_cubic_params[1]*s**2 + self.y_cubic_params[2]*s + self.y_cubic_params[3]
 
-        #Homogeneous Transformation Matrix for Trajectory Pose
+        #Homogeneous Transformation Matrix for Trajectory Pose with respect to base_link
         H_traj = tf.transformations.euler_matrix(0,0,theta_traj)
         H_traj[:,3] = np.array([x_traj, y_traj, 0, 1])
 
 
-        errorTwist = self.GetTwistError(H_current, H_traj)
+        errorTwist = self.GetTwistError(np.eye(4), H_traj)
 
         #Calculating the Feed-forward Term
         x_dot  = 3*self.x_cubic_params[0]*s**2 + 2*self.x_cubic_params[1]*s + self.x_cubic_params[2]
@@ -251,9 +249,12 @@ class NavPlan():
 
     def GetTwistError(self, H_current, H_traj):
 
-        print(H_current) 
-        print(H_current)
-        print(H_traj)
+        ############ ROS Twist messages are in the base link frame so any trajectory plan twsist computation deom current pose
+        ############ to next timestep pose must take place in the base link frame, hence the current frame should be Identity
+
+        # print(H_current) 
+        # print(H_current)
+        # print(H_traj)
 
         errorTransform = np.matmul(H_current, H_traj)
 
@@ -262,9 +263,9 @@ class NavPlan():
         return theta*np.array([v[0], v[1], v[2], omega[0], omega[1], omega[2]])
 
 
-
-
     def H2Twist(self, H):
+
+        # print("H2Twist Called")
 
         if np.all(H[0:3,0:3] == np.eye(3)):
 
@@ -333,28 +334,109 @@ class NavPlan():
 
         self.waypoints.append(waypoint)
 
+################################################### TESTING METHODS ######################################################
+
+    def TestPublishers(self):
+
+        rate = rospy.Rate(10)
+
+        while not rospy.is_shutdown():
+
+            self.twistMessage.linear.x += 0.1
+            self.twistMessage.linear.y = 0
+            self.twistMessage.linear.z = 0
+            self.twistMessage.angular.x = 0
+            self.twistMessage.angular.y -= 0.4
+            self.twistMessage.angular.z = 0
+            self.twistPub.publish(self.twistMessage)
+
+            rate.sleep()
+        
+    def TestRot2Omega(self):
+
+        print("Testing Identity Rotation, result should be 0 rotation and no axis:")
+        theta, omega = self.Rot2Omega(np.eye(3))
+        print("Theta, omega for identity rotation are:")
+        print(theta)
+        print(omega)
+        print()
+
+        print("Testing +90 degree about z-axis rotation, result should be ~1.57 radians and 0,0,1 axis")
+        theta, omega = self.Rot2Omega(np.array([[0,-1,0],[1,0,0],[0,0,1]]))
+        print(theta)
+        print(omega)
+        print()
+
+        print("Testing -90 degree about y-axis rotation, result should be -1.57 radians and 0,1,0 axis or 1.57 rad and 0.-1,0 axis")
+        theta, omega = self.Rot2Omega(np.array([[0,0,-1],[0,1,0],[1,0,0]]))
+        print(theta)
+        print(omega)
+        print()
+
+    def TestH2Twist(self):
+
+        print("Testing Identity Transformation, result should be 0 rotation and no axis and no velocity:")
+        omega, v, theta = self.H2Twist(np.eye(4))
+        print(theta)
+        print(omega)
+        print(v)
+        print("")
+
+        print("Testing +90 degree about z-axis rotation, result should be ~1.57 theta scaling radians and 0,0,1 axis and unit positive velocity in x")
+        omega, v, theta = self.H2Twist(np.array([[0, -1, 0, 1],[1,0,0, 1],[0,0,1, 0], [0,0,0,1]]))
+        print(theta)
+        print(omega)
+        print(v)
+        print("")
+
+        print("Testing -90 degree about y-axis rotation, result should be -1.57 radians and 0,1,0 or axis or 1.57 rad and 0.-1,0 axis and and z positive velocity")
+        omega, v, theta = self.H2Twist(np.array([[0,0,-1, -1],[0,1,0, 0],[1,0,0, 1],[0,0,0, 1]]))
+        print(theta)
+        print(omega)
+        print(v)
+        print("")
+
+    def TestGetTwistError(self):
+
+        print("Testing Identity Transformation, result should be a zero twist:")
+        twist = self.GetTwistError(np.eye(4), np.eye(4))
+        print(twist)
+        print("")
+
+        print("Testing +90 degree about z-axis rotation, result should be ~1.57 theta scaling radians and 0,0,1 axis and unit positive velocity in x")
+        twist = self.GetTwistError(np.array([[1, 0, 0, 0],[0,1,0, 0],[0,0,1, 0], [0,0,0,1]]), np.array([[0, -1, 0, -1],[1,0,0, 1],[0,0,1, 0], [0,0,0,1]]))
+        print(twist)
+        print("")
+
+
+    def TestGenerateTwists(self):
+
+        print("Testing Identity Transformation, result should be a zero twist:")
+        self.GenerateTwists()
+
+
+
 
 
 
 navPlan = NavPlan()
 navPlan.StartNode()
 navPlan.UpdatePathParams()
-# navPlan.GenerateTwists()
 
-# R = np.asarray([[0, -1, 0],[1,0,0],[0,0,1]])
 
-H = np.asarray([[0, -1, 0, 1],[1,0,0, 1],[0,0,1, 0], [0,0,0,1]])
+#########################Testing Rot2Omega
+# navPlan.TestRot2Omega()
 
-# H = np.eye(4)
+#########################Testing H2Twist
+# navPlan.TestH2Twist()
 
-# theta, omega = navPlan.Rot2Omega(R)
+#########################Testing GetTwistError
+# navPlan.TestGetTwistError()
 
-omega, v, theta = navPlan.H2Twist(H)
+#########################Generate Twists
 
-print(theta)
+while not rospy.is_shutdown():
+    navPlan.TestGenerateTwists()
 
-print(omega)
 
-print(v)
-# navPlan.testPub()
 rospy.spin()
