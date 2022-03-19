@@ -164,7 +164,7 @@ class NavPlan():
         #Initializing Goal Locations
         self.nextGoal = Pose()
 
-        self.nextGoal.position.x = -0.3
+        self.nextGoal.position.x = 0.0
         self.nextGoal.position.y = 0
         self.nextGoal.position.z = 0
 
