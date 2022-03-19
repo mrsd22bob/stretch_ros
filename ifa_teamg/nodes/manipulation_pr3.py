@@ -20,8 +20,7 @@ class Manipulation_pr3(hm.HelloNode):
         hm.HelloNode.__init__(self)
         self.tf_buffer = None
         self.tf_listener = None
-	
-        #self.wrist_sub = rospy.Subscriber("/aruco_single/pose", PoseStamped, self.moveWristToMarker, queue_size=1)
+	self.wrist_sub = rospy.Subscriber("/aruco_single/pose", PoseStamped, self.moveWristToMarker, queue_size=1)
 	
 	
     #def turnOnManipulationMode(self):
@@ -63,7 +62,7 @@ if __name__ == '__main__':
     try:
         node = Manipulation_pr3()      
         node.main()       
-	wrist_sub = rospy.Subscriber("/aruco_single/pose", PoseStamped, node.moveWristToMarker)
+	#wrist_sub = rospy.Subscriber("/aruco_single/pose", PoseStamped, node.moveWristToMarker)
 	rospy.spin()
 
     except KeyboardInterrupt:
