@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from pyexpat.errors import XML_ERROR_ABORTED
 import rospy
 from geometry_msgs.msg import Twist, PoseStamped, Pose
 from nav_msgs.msg import Odometry
@@ -110,9 +111,6 @@ class NavPlan():
         #Initializing Waypoint Tracking Node
         rospy.init_node('way_point_tracker', anonymous=True)
 
-        #Path Start Time Offset
-        self.path_start_time_offset = rospy.Time.now()
-
         # Creating Transform Listener
         self.tf_listener = tf.TransformListener()
 
@@ -142,7 +140,39 @@ class NavPlan():
             
             self.twistPub.publish(self.twistMessage)
 
-    
+
+    def SetNextWaypoint(self):
+
+        #Path Start Time Offset
+        self.path_start_time_offset = rospy.Time.now()
+
+        #Initializing Goal Locations
+        self.atGoal = Pose()
+
+        self.atGoal.position.x = 0
+        self.atGoal.position.y = 0
+        self.atGoal.position.z = 0
+
+        self.atGoal.orientation.x = 0
+        self.atGoal.orientation.y = 0
+        self.atGoal.orientation.z = 0
+        self.atGoal.orientation.w = 1
+
+        #FOR UNIT TESTING!!!!!! SETTING CURRENT POSE TO ATGOAL TO CHECK TRANSFORMATION
+        # self.currentPose.pose = self.atGoal
+
+        #Initializing Goal Locations
+        self.nextGoal = Pose()
+
+        self.nextGoal.position.x = -0.3
+        self.nextGoal.position.y = 0
+        self.nextGoal.position.z = 0
+
+        self.nextGoal.orientation.x = 0
+        self.nextGoal.orientation.y = 0
+        self.nextGoal.orientation.z = 0
+        self.nextGoal.orientation.w = 1
+
 
     #This is called when after a goal waypoint has been reached
     def UpdatePathParams(self):
@@ -161,6 +191,8 @@ class NavPlan():
 
         theta_constraints = np.asarray([theta_next, theta_at, 0, 0])
         self.theta_cubic_params = np.matmul(self.s_coeff_mat_inv, theta_constraints)
+
+        
         
         time.sleep(1)
 
@@ -176,76 +208,106 @@ class NavPlan():
 
     def GenerateTwists(self):
 
-        # PD on error + FF term based on time scaling of path
-        now = rospy.Time.now()
+        while not rospy.is_shutdown():
 
-        
+            # PD on error + FF term based on time scaling of path
+            now = rospy.Time.now()
 
-        #FIX THIS LATER
-        s = (now.secs + (now.nsecs*1e-9) - self.path_start_time_offset.secs - self.path_start_time_offset.nsecs)/self.path_duration
+            
 
+            #FIX THIS LATER
+            s = (now.secs + (now.nsecs*1e-9) - self.path_start_time_offset.secs - (self.path_start_time_offset.nsecs*1e-9))/self.path_duration
 
-        #FOR NOW TEST WITH THIS
-        s = 1
-
-        currentPose = self.currentPose.pose
-
-        currentTime = self.currentPose.header.stamp
-
-        self.tf_listener.waitForTransform( '/base_link', '/odom', currentTime, rospy.Duration(1))
-
-        (trans,rot) = self.tf_listener.lookupTransform('/base_link', '/odom', currentTime)
-
-        H_odom2base = tf.transformations.quaternion_matrix(rot)
-
-        H_odom2base[:3,3] = np.array(trans)
-
-        print(H_odom2base)
-
-        #Homogeneous Transformation Matrix for Current Pose
-        H_current = tf.transformations.quaternion_matrix([currentPose.orientation.x,currentPose.orientation.y,currentPose.orientation.z,currentPose.orientation.w])
-        H_current[:,3] = np.array([currentPose.position.x, currentPose.position.y, currentPose.position.z, 1])
-
-        
-
-        
-        theta_traj = self.theta_cubic_params[0]*s**3 + self.theta_cubic_params[1]*s**2 + self.theta_cubic_params[2]*s + self.theta_cubic_params[3]
-        x_traj = self.x_cubic_params[0]*s**3 + self.x_cubic_params[1]*s**2 + self.x_cubic_params[2]*s + self.x_cubic_params[3]
-        y_traj = self.y_cubic_params[0]*s**3 + self.y_cubic_params[1]*s**2 + self.y_cubic_params[2]*s + self.y_cubic_params[3]
-
-        #Homogeneous Transformation Matrix for Trajectory Pose with respect to base_link
-        H_traj = tf.transformations.euler_matrix(0,0,theta_traj)
-        H_traj[:,3] = np.array([x_traj, y_traj, 0, 1])
+            if s>1:
+                s=1
 
 
-        errorTwist = self.GetTwistError(np.eye(4), H_traj)
+            #FOR NOW TEST WITH THIS
+            # s = 1
 
-        #Calculating the Feed-forward Term
-        x_dot  = 3*self.x_cubic_params[0]*s**2 + 2*self.x_cubic_params[1]*s + self.x_cubic_params[2]
-        y_dot = 3*self.y_cubic_params[0]*s**2 + 2*self.y_cubic_params[1]*s + self.y_cubic_params[2]
-        theta_dot = 3*self.theta_cubic_params[0]*s**2 + 2*self.theta_cubic_params[1]*s + self.theta_cubic_params[2]
+            currentPose = self.currentPose.pose
+
+            currentTime = self.currentPose.header.stamp
+
+            self.tf_listener.waitForTransform( '/base_link', '/odom', currentTime, rospy.Duration(1))
+
+            (trans,rot) = self.tf_listener.lookupTransform('/base_link', '/odom', currentTime)
+
+            H_odom2base = tf.transformations.quaternion_matrix(rot)
+
+            H_odom2base[:3,3] = np.array(trans)
+
+            # print(H_odom2base)
+
+            #Homogeneous Transformation Matrix for Current Pose
+            H_current = tf.transformations.quaternion_matrix([currentPose.orientation.x,currentPose.orientation.y,currentPose.orientation.z,currentPose.orientation.w])
+            H_current[:,3] = np.array([currentPose.position.x, currentPose.position.y, currentPose.position.z, 1])
+
+            print(s)
+            
+            theta_traj = self.theta_cubic_params[0]*s**3 + self.theta_cubic_params[1]*s**2 + self.theta_cubic_params[2]*s + self.theta_cubic_params[3]
+            x_traj = self.x_cubic_params[0]*s**3 + self.x_cubic_params[1]*s**2 + self.x_cubic_params[2]*s + self.x_cubic_params[3]
+            y_traj = self.y_cubic_params[0]*s**3 + self.y_cubic_params[1]*s**2 + self.y_cubic_params[2]*s + self.y_cubic_params[3]
+
+            #Homogeneous Transformation Matrix for Trajectory Pose with respect to base_link
+            H_traj = tf.transformations.euler_matrix(0,0,theta_traj)
+            H_traj[:,3] = np.array([x_traj, y_traj, 0, 1])
+
+            # print(H_traj)
 
 
-        self.twistMessage.linear.x = x_dot + self.Kdx*errorTwist[0] + self.Kpx*(x_traj - H_current[0,3])
-        self.twistMessage.linear.y = y_dot + self.Kdy*errorTwist[1] + self.Kpy*(y_traj - H_current[1,3])
-        self.twistMessage.linear.z = 0
+            errorTwist = self.GetTwistError(np.eye(4), H_traj)
 
-        self.twistMessage.angular.x = 0
-        self.twistMessage.angular.y = 0
-        self.twistMessage.angular.z = theta_dot + self.Kdz*errorTwist[5] + self.Kpz*(theta_traj - tf.transformations.euler_from_matrix(H_current)[2])
+            print(errorTwist)
 
-        #Limit velocities
+            #Calculating the Feed-forward Term
+            x_dot  = 3*self.x_cubic_params[0]*s**2 + 2*self.x_cubic_params[1]*s + self.x_cubic_params[2]
+            y_dot = 3*self.y_cubic_params[0]*s**2 + 2*self.y_cubic_params[1]*s + self.y_cubic_params[2]
+            theta_dot = 3*self.theta_cubic_params[0]*s**2 + 2*self.theta_cubic_params[1]*s + self.theta_cubic_params[2]
 
-        if self.twistMessage.linear.x > 0.1:
-            self.twistMessage.linear.x = 0.1
+            x_err = x_traj - H_current[0,3]
+            y_err = y_traj - H_current[1,3]
+            theta_err = theta_traj - tf.transformations.euler_from_matrix(H_current)[2]
 
-        if self.twistMessage.linear.y > 0.1:
-            self.twistMessage.linear.y = 0.1
-        
-        if self.twistMessage.angular.z > 0.1:
-            self.twistMessage.angular.z = 0.1
+            print("Error in x: ", x_err)
+            print("Error in y: ", y_err)
+            print("Error in Theta: ", theta_err)
 
-        self.twistPub.publish(self.twistMessage)
+            self.twistMessage.linear.x = x_dot + self.Kdx*errorTwist[0] + self.Kpx*(x_err)
+            self.twistMessage.linear.y = y_dot + self.Kdy*errorTwist[1] + self.Kpy*(y_err)
+            self.twistMessage.linear.z = 0
+
+            self.twistMessage.angular.x = 0
+            self.twistMessage.angular.y = 0
+            self.twistMessage.angular.z = theta_dot + self.Kdz*errorTwist[5] + self.Kpz*(theta_err)
+
+            #Limit velocities
+
+            if self.twistMessage.linear.x > 0.1:
+                self.twistMessage.linear.x = 0.1
+
+            elif self.twistMessage.linear.x <-0.1:
+                self.twistMessage.linear.x = -0.1
+
+            if self.twistMessage.linear.y > 0.1:
+                self.twistMessage.linear.y = 0.1
+
+            elif self.twistMessage.linear.y <-0.1:
+                self.twistMessage.linear.y = -0.1
+            
+            if self.twistMessage.angular.z > 0.1:
+                self.twistMessage.angular.z = 0.1
+
+            elif self.twistMessage.angular.z <-0.1:
+                self.twistMessage.angular.z = -0.1
+
+            if np.abs(x_err) < 0.01 and np.abs(y_err) < 0.01 and np.abs(theta_err) < 0.01:
+                self.ZeroTwist()
+                continue
+
+            self.twistPub.publish(self.twistMessage)
+
+
 
     def GetTwistError(self, H_current, H_traj):
 
@@ -435,8 +497,12 @@ navPlan.UpdatePathParams()
 
 #########################Generate Twists
 
-while not rospy.is_shutdown():
-    navPlan.TestGenerateTwists()
+navPlan.SetNextWaypoint()
+navPlan.UpdatePathParams()
+navPlan.GenerateTwists()
+
+# while not rospy.is_shutdown():
+#     navPlan.TestGenerateTwists()
 
 
 rospy.spin()
