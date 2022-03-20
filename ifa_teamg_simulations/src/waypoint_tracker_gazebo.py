@@ -24,10 +24,10 @@ class NavPlan():
         self.wayptSub = rospy.Subscriber("way_point", PoseStamped, self.AddWaypoints)
 
         #Initializing Subscriber to waypoints
-        self.odomSub = rospy.Subscriber('/odom', Odometry, self.UpdateCurrentPose)
+        self.odomSub = rospy.Subscriber('/stretch_diff_drive_controller/odom', Odometry, self.UpdateCurrentPose)
 
         #Initializing Publisher to robot's cmd_vel topic
-        self.twistPub = rospy.Publisher('stretch/cmd_vel', Twist, queue_size=10)
+        self.twistPub = rospy.Publisher('stretch_diff_drive_controller/cmd_vel', Twist, queue_size=10)
 
         #Twist message initialization
         self.twistMessage = Twist()
@@ -105,6 +105,9 @@ class NavPlan():
         #Maximum Safe Speed
         self.safe_speed = 0.1
 
+        #track only theta
+        self.track_only_theta = False
+
 
 
     def StartNode(self):
@@ -164,8 +167,8 @@ class NavPlan():
         #Initializing Goal Locations
         self.nextGoal = Pose()
 
-        self.nextGoal.position.x = 1.0
-        self.nextGoal.position.y = 0
+        self.nextGoal.position.x = 0.5
+        self.nextGoal.position.y = 0.5
         self.nextGoal.position.z = 0
 
         self.nextGoal.orientation.x = 0
@@ -237,49 +240,62 @@ class NavPlan():
 
             H_odom2base[:3,3] = np.array(trans)
 
-            # print(H_odom2base)
-
-            #Homogeneous Transformation Matrix for Current Pose
             H_current = tf.transformations.quaternion_matrix([currentPose.orientation.x,currentPose.orientation.y,currentPose.orientation.z,currentPose.orientation.w])
             H_current[:,3] = np.array([currentPose.position.x, currentPose.position.y, currentPose.position.z, 1])
 
-            print(s)
+            # print("Current X:", currentPose.position.x)
+            # print("Current Y:", currentPose.position.y)
+            print("Current theta: ", tf.transformations.euler_from_matrix(H_current)[2])
+
+
+            # print("Current X from H: ", H_current[0,3])
+            # print("Current Y from H: ", H_current[1,3])
+
+            # print(H_odom2base)
+
+            #Homogeneous Transformation Matrix for Current Pose
             
-            theta_traj = self.theta_cubic_params[0]*s**3 + self.theta_cubic_params[1]*s**2 + self.theta_cubic_params[2]*s + self.theta_cubic_params[3]
-            x_traj = self.x_cubic_params[0]*s**3 + self.x_cubic_params[1]*s**2 + self.x_cubic_params[2]*s + self.x_cubic_params[3]
-            y_traj = self.y_cubic_params[0]*s**3 + self.y_cubic_params[1]*s**2 + self.y_cubic_params[2]*s + self.y_cubic_params[3]
 
-            #Homogeneous Transformation Matrix for Trajectory Pose with respect to base_link
-            H_traj = tf.transformations.euler_matrix(0,0,theta_traj)
-            H_traj[:,3] = np.array([x_traj, y_traj, 0, 1])
+            x_err = 0.5 - H_current[0,3]
+            y_err = 0.5 - H_current[1,3]
+            theta_err = np.arctan2(1 - H_current[1,3], 1-H_current[0,3]) - tf.transformations.euler_from_matrix(H_current)[2]
 
-            # print(H_traj)
+            print("Error in X: ", x_err)
+            print("Error in Y: ", y_err)
+            print("Error in theta: ", theta_err)
+
+            dist = np.sqrt((x_err)**2 + (y_err)**2)
+
+            if not self.track_only_theta:
+
+                self.twistMessage.linear.x = self.Kpx*dist*10
+                self.twistMessage.linear.y = 0
+                self.twistMessage.linear.z = 0
+
+                self.twistMessage.angular.x = 0
+                self.twistMessage.angular.y = 0
+                self.twistMessage.angular.z = theta_err*50
+
+            else:
+                self.twistMessage.linear.x = 0
+                self.twistMessage.linear.y = 0
+                self.twistMessage.linear.z = 0
+
+                self.twistMessage.angular.x = 0
+                self.twistMessage.angular.y = 0
+                self.twistMessage.angular.z = 0
 
 
-            errorTwist = self.GetTwistError(np.eye(4), H_traj)
 
-            print(errorTwist)
+            print("s", s)
+            print("Dist: ", dist)
+            print("Final theta:", tf.transformations.euler_from_quaternion([self.nextGoal.orientation.x, self.nextGoal.orientation.y, self.nextGoal.orientation.z, self.nextGoal.orientation.w])[2])
+            # print("Resultant Linear Velocity from Twist: ", lin_vel_from_traj)
+            # print("Angular Velocity from Resultant Linear", theta_vel_extracted_from_velocity)
 
-            #Calculating the Feed-forward Term
-            x_dot  = 3*self.x_cubic_params[0]*s**2 + 2*self.x_cubic_params[1]*s + self.x_cubic_params[2]
-            y_dot = 3*self.y_cubic_params[0]*s**2 + 2*self.y_cubic_params[1]*s + self.y_cubic_params[2]
-            theta_dot = 3*self.theta_cubic_params[0]*s**2 + 2*self.theta_cubic_params[1]*s + self.theta_cubic_params[2]
 
-            x_err = x_traj - H_current[0,3]
-            y_err = y_traj - H_current[1,3]
-            theta_err = theta_traj - tf.transformations.euler_from_matrix(H_current)[2]
 
-            print("Error in x: ", x_err)
-            print("Error in y: ", y_err)
-            print("Error in Theta: ", theta_err)
 
-            self.twistMessage.linear.x = x_dot + self.Kdx*errorTwist[0] + self.Kpx*(x_err)
-            self.twistMessage.linear.y = y_dot + self.Kdy*errorTwist[1] + self.Kpy*(y_err)
-            self.twistMessage.linear.z = 0
-
-            self.twistMessage.angular.x = 0
-            self.twistMessage.angular.y = 0
-            self.twistMessage.angular.z = theta_dot + self.Kdz*errorTwist[5] + self.Kpz*(theta_err)
 
             #Limit velocities
 
@@ -301,8 +317,33 @@ class NavPlan():
             elif self.twistMessage.angular.z <-0.1:
                 self.twistMessage.angular.z = -0.1
 
-            if np.abs(x_err) < 0.01 and np.abs(y_err) < 0.01 and np.abs(theta_err) < 0.01:
-                self.ZeroTwist()
+            if np.abs(x_err) < 0.01 and np.abs(y_err) < 0.01:
+                self.track_only_theta = True
+                theta_final = tf.transformations.euler_from_quaternion([self.nextGoal.orientation.x, self.nextGoal.orientation.y, self.nextGoal.orientation.z, self.nextGoal.orientation.w])[2]
+                print("New final theta goal is:", theta_final)
+                theta_err = theta_final - tf.transformations.euler_from_matrix(H_current)[2]
+
+                print("New Theta Err: ", theta_err)
+                self.twistMessage.linear.x = 0
+                self.twistMessage.linear.y = 0
+                self.twistMessage.linear.z = 0
+
+                self.twistMessage.angular.x = 0
+                self.twistMessage.angular.y = 0
+                self.twistMessage.angular.z = theta_err*10
+
+                if self.twistMessage.angular.z > 0.1:
+                    self.twistMessage.angular.z = 0.1
+
+                elif self.twistMessage.angular.z <-0.1:
+                    self.twistMessage.angular.z = -0.1
+
+
+
+                self.twistPub.publish(self.twistMessage)
+
+                if (np.abs(theta_err)<0.01):
+                    self.ZeroTwist()
                 continue
 
             self.twistPub.publish(self.twistMessage)
@@ -506,3 +547,4 @@ navPlan.GenerateTwists()
 
 
 rospy.spin()
+
