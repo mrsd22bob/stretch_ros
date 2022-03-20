@@ -61,7 +61,7 @@ class Robot(hm.HelloNode):
 
         self.waypoints = []
 
-        self.safe_dist = 0.35
+        self.safe_dist = 0.2
 
         
 
@@ -172,7 +172,7 @@ class Robot(hm.HelloNode):
                             self.centroids.append([cent_x, cent_y, R_xy])
 
                             #Adding waypoints in the odometry frame
-                            # self.waypoints = np.asarray([[cent_x], [cent_y+self.safe_dist]])
+                            self.waypoints = np.asarray([[cent_x], [cent_y]])
 
                             #create goal tuple to send to move_base_call
                             transform_base_to_odom = hm.get_p1_to_p2_matrix("base_link", "odom", self.tf2_buffer)[0]
@@ -200,7 +200,7 @@ class Robot(hm.HelloNode):
                             self.centroids.append([cent_x, cent_y, R_xy])
 
                             #Adding waypoints in the odometry frame
-                            # self.waypoints = np.hstack((self.waypoints, np.asarray([[cent_x],[cent_y]])))
+                            self.waypoints = np.hstack((self.waypoints, np.asarray([[cent_x],[cent_y]])))
 
                             #create goal tuple to send to move_base_call
                             transform_base_to_odom = hm.get_p1_to_p2_matrix("base_link", "odom", self.tf2_buffer)[0]
@@ -225,13 +225,15 @@ class Robot(hm.HelloNode):
                             self.nav_path.poses.append(pose)
                             
 
-                        print(self.waypoints)
+            
 
                         # print("Waypoints added succesfully")
                     
                 #Restart cluster with current point
                 cluster = np.asarray(xyz[:,i])
                 cluster = cluster.reshape((-1,1))
+
+            print(self.waypoints)
 
                 
 

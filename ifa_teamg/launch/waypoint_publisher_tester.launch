@@ -41,7 +41,7 @@
           params:
             box_frame: base_link
             min_x: -15
-            max_x: -0.15
+            max_x: 0
             min_y: -15
             max_y: 0
             min_z: -10
