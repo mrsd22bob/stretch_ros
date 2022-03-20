@@ -106,6 +106,8 @@ class Robot(hm.HelloNode):
         self.trajectory_client.wait_for_result()
 
     def process_cloud(self, pc_baselink_box):
+
+        print("Processing Cloud")
         
         # print(pc_baselink_box.header.frame_id)
         xyz = rnp.point_cloud2.pointcloud2_to_xyz_array(pc_baselink_box).T
@@ -140,9 +142,6 @@ class Robot(hm.HelloNode):
    
 
             if np.linalg.norm([xyz[0,i] - xyz[0,i-1], xyz[1,i] - xyz[1,i-1]]) < self.cluster_threshold and cluster.shape[1] < self.cluster_max_points:
-
-
-
                 # print(cluster.shape)
                 # print(xyz[:,i].reshape((-1,1)).shape)
                 cluster = np.hstack((cluster, xyz[:,i].reshape((-1,1))))
@@ -168,6 +167,8 @@ class Robot(hm.HelloNode):
                         # print("Centroid received is: ", [cent_x, cent_y])
 
                         if len(self.centroids) == 0:
+                            print("Adding Cluster")
+
                             self.centroids.append([cent_x, cent_y, R_xy])
 
                             #Adding waypoints in the odometry frame
@@ -195,14 +196,16 @@ class Robot(hm.HelloNode):
 
 
                         elif np.linalg.norm([self.centroids[-1][0] - cent_x, self.centroids[-1][1] - cent_y]) > self.pot_spacing:
+                            print("Adding Cluster")
                             self.centroids.append([cent_x, cent_y, R_xy])
 
                             #Adding waypoints in the odometry frame
-                            self.waypoints = np.hstack((self.waypoints, np.asarray([[cent_x],[cent_y]])))
+                            # self.waypoints = np.hstack((self.waypoints, np.asarray([[cent_x],[cent_y]])))
 
                             #create goal tuple to send to move_base_call
                             transform_base_to_odom = hm.get_p1_to_p2_matrix("base_link", "odom", self.tf2_buffer)[0]
                             goal_orientation = np.arctan2(self.waypoints[1,-1] - self.waypoints[1,-2], self.waypoints[0,-1] - self.waypoints[0,-2])
+                            goal_orientation = quaternion_from_euler(0,0,goal_orientation)
 
 
                             goal_vec_odom = np.asarray([[self.waypoints[0,0] + self.safe_dist*np.cos(goal_orientation + np.pi/2)], [self.waypoints[1,0] + self.safe_dist*np.sin(goal_orientation + np.pi/2)], [0], [1]])
@@ -245,7 +248,7 @@ class Robot(hm.HelloNode):
 
 
     def main(self):
-        hm.HelloNode.main(self,'navigation_scratch_pad', 'navigation', wait_for_first_pointcloud=False)
+        hm.HelloNode.main(self,'waypoint_publisher', 'navigation', wait_for_first_pointcloud=False)
 
         # Initializing Message for Navigation Path
         self.nav_path = Path()
