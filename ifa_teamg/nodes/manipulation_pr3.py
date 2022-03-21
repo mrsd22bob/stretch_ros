@@ -33,8 +33,8 @@ class Manipulation_pr3(hm.HelloNode):
 
 	def moveWristToMarker(self, pose):
 		
-		# transform 'aruco_frame:base_link' to 'base_link'
-		target_frame = 'base_link'
+		# transform 'aruco_frame:base_link' to 'base_link'-> might want to try link_lift? 
+		target_frame = 'base_link' 
 		print(pose.header.frame_id[1:])
 
 		transform = self.tf_buffer.lookup_transform(target_frame, pose.header.frame_id[1:], pose.header.stamp)
