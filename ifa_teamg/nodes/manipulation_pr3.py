@@ -41,7 +41,7 @@ class Manipulation_pr3(hm.HelloNode):
 		pose_transformed = tf2_geometry_msgs.do_transform_pose(pose, transform)
 
 		# returns trans:xyz orien:xyzw
-		offset_y = -0.151 #changing this to positive may be a way to calibrate the offset. 
+		offset_y = -0.215 #changing this to positive may be a way to calibrate the offset. 
 		offset_z = 0.185 #0.250 #robot's arm is lower than the center of aruco marker.. why?
 		print(pose_transformed)
 		pose_z = pose_transformed.pose.position.z - offset_z

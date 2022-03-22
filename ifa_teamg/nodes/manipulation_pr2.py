@@ -13,7 +13,7 @@ class ManipulationPr2(hm.HelloNode):
     def __init__(self):
         hm.HelloNode.__init__(self)
         self.rate = 10.0
-        self.desiredPt = {'wrist_extension': 1.0, 'joint_lift': 1.0}
+        self.desiredPt = {'wrist_extension': 0.0, 'joint_lift': 0.0}
 
     def simpleTest(self):
         self.move_to_pose(self.desiredPt)
