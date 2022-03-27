@@ -1,0 +1,340 @@
+#!/usr/bin/env python
+
+from logging.config import valid_ident
+from re import X
+
+from cv2 import line
+import rospy
+from std_srvs.srv import Trigger, TriggerRequest
+from sensor_msgs.msg import JointState, PointCloud2, LaserScan
+from control_msgs.msg import FollowJointTrajectoryGoal
+from trajectory_msgs.msg import JointTrajectoryPoint
+from nav_msgs.msg import Odometry
+from geometry_msgs.msg import Twist, PoseStamped
+from nav_msgs.msg import Path
+from ifa_teamg.msg import PotLine
+
+from move_base_msgs.msg import MoveBaseActionGoal
+
+#for quaternion tranformation from Euler to Quaternion
+from tf.transformations import quaternion_from_euler
+
+from scipy import optimize
+
+import math
+import ros_numpy as rnp
+# from ros_numpy import point_cloud2
+import numpy as np
+
+import tf
+
+import actionlib
+from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
+
+
+class NavPlanner():
+
+    def __init__(self):
+
+        self.rate = 10.0
+
+        self.explore_goal = None
+
+        self.waypoints = []
+
+        self.pot_line = []
+
+        self.aruco_count_1 = 0
+
+        self.aruco_count_2 = 0
+
+        self.insight_aruco = PoseStamped()
+
+        self.aruco_update_dist_threshold = 0.2
+
+        self.explore_goal = PoseStamped()
+        self.explore_goal.header.frame_id = 'base_link'
+
+        self.waypoint_tracking_list = []
+
+        self.mode = 'explore'
+
+        #Line parameters in the bse_link after processing LiDAR
+        self.m = None
+        self.c = None
+
+        #Using the twist for rudimentary motion implementation without using move_base
+        # self.twist_msg = Twist()
+
+        #Using MoveBaseActionGoal for motion implementation using move_base
+        # self.move_msg = MoveBaseActionGoal()
+        # self.move_msg_count = 0
+
+        # self.move_msg_simple = PoseStamped()
+        # self.move_msg_count = 0
+
+        #Velocity Publisher for the base
+        # self.velocity_pub = rospy.Publisher("/stretch/cmd_vel", Twist, queue_size=1)
+
+        #Move-base Publisher for the base
+        # self.move_base_goal_pub = rospy.Publisher("move_base/goal", MoveBaseActionGoal, queue_size=1)
+
+        #Move-base Simple Goal Publisher for the base
+        # self.move_base_simple_goal_pub = rospy.Publisher("/move_base_simple/goal", PoseStamped, queue_size=1)
+
+    #def display_test_stats()
+
+    def PickAWaypoint(self):
+
+        if self.mode == 'explore':
+
+            if self.explore_goal:
+                
+                try:
+                    if (self.insight_aruco.pose.position.x - self.explore_goal.pose.position.x) > 0.3:
+                        print("Exploring")
+                        goalpt = self.tf_listener.transformPose("/odom", self.explore_goal)
+                        goal = MoveBaseGoal()
+                        goal.target_pose.header.frame_id = "odom"
+                        goal.target_pose.header.stamp = rospy.Time.now()
+                        goal.target_pose.pose.position = goalpt.pose.position
+                        goal.target_pose.pose.orientation = goalpt.pose.orientation
+
+                        self.movebase_client.send_goal(goal)
+                        wait = self.movebase_client.wait_for_result()
+
+                    elif (self.insight_aruco.pose.position.x - self.explore_goal.pose.position.x) <= 0.3 and (self.insight_aruco.pose.position.x - self.explore_goal.pose.position.x) > 0:
+                        print("Sending Aruco Goal")
+
+                        for i in range(3):
+                            goalpt = self.tf_listener.transformPose("/odom", self.turn_goals[i])
+                            goal = MoveBaseGoal()
+                            goal.target_pose.header.frame_id = "odom"
+                            goal.target_pose.header.stamp = rospy.Time.now()
+                            goal.target_pose.pose.position = goalpt.pose.position
+                            goal.target_pose.pose.orientation = goalpt.pose.orientation
+
+                            self.movebase_client.send_goal(goal)
+                            wait = self.movebase_client.wait_for_result()
+
+                    else:
+                        # print("Exploring")
+                        goalpt = self.tf_listener.transformPose("/odom", self.explore_goal)
+                        # print("After listener")
+                        goal = MoveBaseGoal()
+                        goal.target_pose.header.frame_id = "odom"
+                        goal.target_pose.header.stamp = rospy.Time.now()
+                        goal.target_pose.pose.position = goalpt.pose.position
+                        goal.target_pose.pose.orientation = goalpt.pose.orientation
+                        # print("a")
+
+                        if not (self.explore_goal.pose.position.x ==0 and self.explore_goal.pose.position.y ==0):
+                            print("Sending Goal")
+                            self.movebase_client.send_goal(goal)
+                            wait = self.movebase_client.wait_for_result()
+                        else:
+                            pass
+                        # print("b")
+
+                except:
+                    pass
+                    
+                    print("No Waypoints or Pots to Track")
+
+    def odom_update(self, odom_feedback):
+
+        self.x_current = odom_feedback.pose.pose.position.x
+        self.y_current = odom_feedback.pose.pose.position.y
+
+
+    def UpdateLine(self, potLines):
+        self.pot_lines = potLines
+
+        # print(self.pot_lines.points[0].x)
+
+        self.m = (self.pot_lines.points[1].y - self.pot_lines.points[0].y)/(self.pot_lines.points[1].x - self.pot_lines.points[0].x)
+        self.c = self.pot_lines.points[0].y - (self.m*self.pot_lines.points[0].x)
+        rad = np.arctan(self.m)
+
+        tmpgoal = PoseStamped()
+
+        # print("In Lidar Point Update")
+
+        tmpgoal.header.stamp = self.pot_lines.header.stamp
+        tmpgoal.header.frame_id = '/base_link'
+        tmpgoal.pose.position.x = 0.2*self.pot_lines.points[1].x
+        tmpgoal.pose.position.y = 0.2*self.pot_lines.points[1].y
+        tmpgoal.pose.position.z = 0
+        orientation = quaternion_from_euler(0,0,rad)
+        tmpgoal.pose.orientation.x = orientation[0]
+        tmpgoal.pose.orientation.y = orientation[1]
+        tmpgoal.pose.orientation.z = orientation[2]
+        tmpgoal.pose.orientation.w = orientation[3]
+        self.explore_goal = tmpgoal
+
+        print(self.explore_goal)
+        # TransformerROS.transformPose("odom", tmpgoal)
+
+
+    def UpdateArucoEnd(self, marker_pose):
+        #id=59
+        # should be incremented here
+
+        #check if new aruco_marker position is out of threshold of self.current_aruco_pos
+        # if np.linalg.norm([marker_pose.pose.position.x - self.insight_aruco.pose.position.x, marker_pose.pose.position.y - self.insight_aruco.pose.position.y, marker_pose.pose.position.z - self.insight_aruco.pose.position.z])>self.aruco_update_dist_threshold:
+            #if true - store self.current_aruco_loc = aruco_marker.position
+        self.insight_aruco = marker_pose  ## Always will be in base_link
+
+        if self.pot_line:
+            self.turn_goals = []
+
+            # arpt = TransformerROS.transformPose("base_link", self.insight_aruco)
+            a = self.insight_aruco.pose.position.x
+            b = self.insight_aruco.pose.position.y
+
+            A = np.array([[self.m, -1],[1, self.m]],)
+            b = np.array([self.c, self.m*b + a])
+
+            X = np.linalg.solve(A,b)
+            rad = np.arctan(self.m)
+
+            goalpose = PoseStamped()
+            goalpose.header.stamp = self.insight_aruco.header.stamp
+            goalpose.header.frame_id = '/base_link'
+
+            goalpose.pose.position.x = X[0]
+            goalpose.pose.position.y = X[1]
+            goalpose.pose.position.z =  0
+            orientation = quaternion_from_euler(0,0,rad)
+            goalpose.pose.orientation.x = orientation[0]
+            goalpose.pose.orientation.y = orientation[1]
+            goalpose.pose.orientation.z = orientation[2]
+            goalpose.pose.orientation.w = orientation[3]
+            # glpt = TransformerROS.transformPose("odom", goalpose)
+            self.turn_goals.append(goalpose)
+
+            goalpose.pose.position.x = X[0] + 0.5
+            goalpose.pose.position.y = X[1] - 0.5
+            goalpose.pose.position.z =  0
+            orientation = quaternion_from_euler(0,0,rad - np.pi/2)
+            goalpose.pose.orientation.x = orientation[0]
+            goalpose.pose.orientation.y = orientation[1]
+            goalpose.pose.orientation.z = orientation[2]
+            goalpose.pose.orientation.w = orientation[3]
+            # glpt = TransformerROS.transformPose("odom", goalpose)
+            self.turn_goals.append(goalpose)
+
+            goalpose.pose.position.x = X[0]
+            goalpose.pose.position.y = X[1] - 1
+            goalpose.pose.position.z =  0
+            orientation = quaternion_from_euler(0,0,rad - np.pi)
+            goalpose.pose.orientation.x = orientation[0]
+            goalpose.pose.orientation.y = orientation[1]
+            goalpose.pose.orientation.z = orientation[2]
+            goalpose.pose.orientation.w = orientation[3]
+            # glpt = TransformerROS.transformPose("odom", goalpose)
+            self.turn_goals.append(goalpose)
+
+    def UpdateArucoU(self, marker_pose):
+
+        # should be incremented here
+
+        #check if new aruco_marker position is out of threshold of self.current_aruco_pos
+        # if np.linalg.norm([marker_pose.pose.position.x - self.insight_aruco.pose.position.x, marker_pose.pose.position.y - self.insight_aruco.pose.position.y, marker_pose.pose.position.z - self.insight_aruco.pose.position.z])>self.aruco_update_dist_threshold:
+            #if true - store self.current_aruco_loc = aruco_marker.position
+        self.insight_aruco = marker_pose  ## Always will be in base_link
+
+        if self.pot_line:
+            self.turn_goals = []
+
+            # arpt = TransformerROS.transformPose("base_link", self.insight_aruco)
+            a = self.insight_aruco.pose.position.x
+            b = self.insight_aruco.pose.position.y
+
+            A = np.array([[self.m, -1],[1, self.m]],)
+            b = np.array([self.c, self.m*b + a])
+
+            X = np.linalg.solve(A,b)
+            rad = np.arctan(self.m)
+
+            goalpose = PoseStamped()
+
+            goalpose.header.stamp = self.insight_aruco.header.stamp
+            goalpose.header.frame_id = '/base_link'
+
+            goalpose.pose.position.x = X[0]
+            goalpose.pose.position.y = X[1]
+            goalpose.pose.position.z =  0
+            orientation = quaternion_from_euler(0,0,rad)
+            goalpose.pose.orientation.x = orientation[0]
+            goalpose.pose.orientation.y = orientation[1]
+            goalpose.pose.orientation.z = orientation[2]
+            goalpose.pose.orientation.w = orientation[3]
+            # glpt = TransformerROS.transformPose("odom", goalpose)
+            self.turn_goals.append(goalpose)
+
+            goalpose.pose.position.x = X[0] + 0.1
+            goalpose.pose.position.y = X[1] - 0.1
+            goalpose.pose.position.z =  0
+            orientation = quaternion_from_euler(0,0,rad - np.pi/2)
+            goalpose.pose.orientation.x = orientation[0]
+            goalpose.pose.orientation.y = orientation[1]
+            goalpose.pose.orientation.z = orientation[2]
+            goalpose.pose.orientation.w = orientation[3]
+            # glpt = TransformerROS.transformPose("odom", goalpose)
+            self.turn_goals.append(goalpose)
+
+            goalpose.pose.position.x = X[0]
+            goalpose.pose.position.y = X[1] - 0.2
+            goalpose.pose.position.z =  0
+            orientation = quaternion_from_euler(0,0,rad - np.pi)
+            goalpose.pose.orientation.x = orientation[0]
+            goalpose.pose.orientation.y = orientation[1]
+            goalpose.pose.orientation.z = orientation[2]
+            goalpose.pose.orientation.w = orientation[3]
+            # glpt = TransformerROS.transformPose("odom", goalpose)
+            self.turn_goals.append(goalpose)
+        #id=69
+
+
+    """TO BE DONE LATER WHEN DETECTIONS ARE MADE AVAILABLE"""
+    # def update_detections(self, listOfDetections):
+
+    #     self.detection_list = []
+
+    #     for m in listOfDetections:
+    #         self.detection_list.append(m.position)
+    # 
+    def main(self):
+        rospy.init_node('waypoint_accumulator_publisher', anonymous=True)
+        self.movebase_client = actionlib.SimpleActionClient('move_base',MoveBaseAction)
+        self.tf_listener = tf.TransformListener()
+        
+
+
+if __name__ == '__main__':
+
+    try:
+        node = NavPlanner()
+        node.main()
+
+        odom_subscriber = rospy.Subscriber('/odom', Odometry, node.odom_update)
+
+        pot_line_sub = rospy.Subscriber('/guide_vector_base', PotLine, node.UpdateLine)
+
+        #TODO: change aruco topic to be in baselink!!!!!!!!
+        aruco_sub = rospy.Subscriber('/aruco_simple/pose1', PoseStamped, node.UpdateArucoEnd)
+
+        #TODO: change aruco topic to be in baselink!!!!!!!!!!!
+        aruco_sub = rospy.Subscriber('/aruco_simple/pose2', PoseStamped, node.UpdateArucoU)
+
+        #TODO: change detection list topic
+        # detection_sub = rospy.Subscriber('/detection_list', DetectionList, node.UpdateDetections)
+
+        while not rospy.is_shutdown():
+            node.PickAWaypoint()
+
+        rospy.spin()
+
+    except KeyboardInterrupt:
+        rospy.loginfo('interrupt received bro!!! Gotcha!')
