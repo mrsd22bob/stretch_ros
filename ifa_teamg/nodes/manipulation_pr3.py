@@ -33,7 +33,7 @@ class Manipulation_pr3(hm.HelloNode):
 
 	def moveWristToMarker(self, pose):
 		
-		# transform 'aruco_frame:base_link' to 'base_link'-> might want to try link_lift? 
+		# transform 'aruco_frame:base_link' to 'base_link'-> might want to try link_lift? no
 		target_frame = 'base_link' 
 		print(pose.header.frame_id[1:])
 
@@ -47,10 +47,21 @@ class Manipulation_pr3(hm.HelloNode):
 		pose_z = pose_transformed.pose.position.z - offset_z
 		pose_y = -(pose_transformed.pose.position.y - offset_y)
 
+
+		pose_arm_retract = {'wrist_extension' : 0.0}
 		pose_desired = {'joint_lift' : pose_z, 'wrist_extension' : pose_y }
 		print(pose_desired)
-		self.move_to_pose(pose_desired)
+		pose_desired_z = {'joint_lift' : pose_z}
+		pose_desired_y = {'wrist_extension' : pose_y}
+		self.move_to_pose(pose_arm_retract)
+		self.move_to_pose(pose_desired_z)
+		self.trajectory_client.wait_for_result()
+		self.move_to_pose(pose_desired_y)
+		self.trajectory_client.wait_for_result()
+		#then, the robot needs to stop. 
+		# pose_desired = {'joint_lift' : pose_z, 'wrist_extension' : pose_y }
 		
+
 	# def moveToolToMarker(poses):
 	#   pass
 
