@@ -56,7 +56,7 @@ class Manipulation_pr3(hm.HelloNode):
 
 	def main(self):
 		#rospy.init_node("manipulation_pr3", anonymous=True)
-		hm.HelloNode.main(self, 'manipuation_pr3', 'manipulation_pr3', wait_for_first_pointcloud=False)
+		hm.HelloNode.main(self, 'manipulation_pr3', 'manipulation_pr3', wait_for_first_pointcloud=False)
 		self.tf_buffer = tf2_ros.Buffer(rospy.Duration(10))
 		self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
 		self.wrist_sub = rospy.Subscriber("/aruco_simple/pose", PoseStamped, self.moveWristToMarker, queue_size=1)
