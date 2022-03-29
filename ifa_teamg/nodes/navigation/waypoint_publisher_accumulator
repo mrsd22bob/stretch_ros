@@ -3,6 +3,8 @@
 from logging.config import valid_ident
 from re import X
 
+import time
+
 from cv2 import line
 import rospy
 from std_srvs.srv import Trigger, TriggerRequest
@@ -48,7 +50,7 @@ class NavPlanner():
 
         self.aruco_count_2 = 0
 
-        self.insight_aruco = PoseStamped()
+        self.insight_aruco = None
 
         self.insight_aruco_odom = PoseStamped()
 
@@ -58,6 +60,8 @@ class NavPlanner():
         self.explore_goal.header.frame_id = 'base_link'
 
         self.waypoint_tracking_list = []
+
+        self.turn_goals = [None, None, None]
 
         self.mode = 'explore'
 
@@ -91,21 +95,24 @@ class NavPlanner():
         if self.mode == 'explore':
 
             if self.explore_goal:
+                # print("Here_expl")
+                if self.insight_aruco_odom:
+                    # print("Here_aruc")
+                    now = rospy.Time.now()
+                    # for test in range(500):
+                        # try:
+                    print(self.insight_aruco_odom)
+                    print("Initializing")
+                    self.tf_listener.waitForTransform("/base_link", "/odom", now, rospy.Duration(3))
+                    # aruco_odom = self.tf_listener.transformPose("/odom", self.insight_aruco)
+                    aruco_base_new = self.tf_listener.transformPose("/base_link", self.insight_aruco_odom)
+                            # break
+                        # except:
+                            # print("Waiting for TF to become available")
+                            # pass
+                    # print(test)
+                    print(aruco_base_new)
 
-                for test in range(500):
-                    try:
-                        print("Initializing")
-                        self.tf_listener.waitForTransform("/base_link", "/odom", rospy.Time.now(), rospy.Duration(1))
-                # aruco_odom = self.tf_listener.transformPose("/odom", self.insight_aruco)
-                        aruco_base_new = self.tf_listener.transformPose("/base_link", self.insight_aruco_odom)
-                        break
-                    except:
-                        print("Waiting for TF to become available")
-                        pass
-                # print(test)
-                print(aruco_base_new)
-                
-                try:
                     if (aruco_base_new.pose.position.x - self.explore_goal.pose.position.x) > 0.3:
                         print("Exploring")
                         goalpt = self.tf_listener.transformPose("/odom", self.explore_goal)
@@ -117,7 +124,7 @@ class NavPlanner():
 
                         self.movebase_client.send_goal(goal)
                         wait = self.movebase_client.wait_for_result()
-
+                
                     elif (aruco_base_new.pose.position.x - self.explore_goal.pose.position.x) <= 0.3 and (self.insight_aruco.pose.position.x - self.explore_goal.pose.position.x) > 0:
                         print("Sending Aruco Goal")
 
@@ -153,10 +160,10 @@ class NavPlanner():
                             pass
                         # print("b")
 
-                except:
-                    pass
-                    
-                    print("No Waypoints or Pots to Track")
+                # except:
+                #     pass
+        else:
+            print("No Waypoints or Pots to Track")
 
     def odom_update(self, odom_feedback):
 
@@ -203,12 +210,17 @@ class NavPlanner():
             #if true - store self.current_aruco_loc = aruco_marker.position
         self.insight_aruco = marker_pose  ## Always will be in base_link
 
-        self.tf_listener.waitForTransform("/odom", "/base_link", rospy.Time.now(), rospy.Duration(5))
+        # print(marker_pose.header.stamp)
+        print("ENDARUCO START")
+        self.tf_listener.waitForTransform("/odom", "/base_link", marker_pose.header.stamp, rospy.Duration(1))
         self.insight_aruco_odom = self.tf_listener.transformPose("/odom", marker_pose)
+        print("ENDARUCO ODOM CONVERTER")
         # aruco_base_new = self.tf_listener.transformPose("/base_link", aruco_odom)
-
+        print(self.insight_aruco_odom)
         if self.pot_line:
-            self.turn_goals = []
+            # self.turn_goals = []
+
+            print("We're in aruco end goal creation")
 
             # arpt = TransformerROS.transformPose("base_link", self.insight_aruco)
             a = self.insight_aruco.pose.position.x
@@ -233,7 +245,7 @@ class NavPlanner():
             goalpose.pose.orientation.z = orientation[2]
             goalpose.pose.orientation.w = orientation[3]
             # glpt = TransformerROS.transformPose("odom", goalpose)
-            self.turn_goals.append(goalpose)
+            self.turn_goals[0] = goalpose
 
             goalpose.pose.position.x = X[0] + 0.5
             goalpose.pose.position.y = X[1] - 0.5
@@ -244,7 +256,7 @@ class NavPlanner():
             goalpose.pose.orientation.z = orientation[2]
             goalpose.pose.orientation.w = orientation[3]
             # glpt = TransformerROS.transformPose("odom", goalpose)
-            self.turn_goals.append(goalpose)
+            self.turn_goals[1] = goalpose
 
             goalpose.pose.position.x = X[0]
             goalpose.pose.position.y = X[1] - 1
@@ -255,7 +267,7 @@ class NavPlanner():
             goalpose.pose.orientation.z = orientation[2]
             goalpose.pose.orientation.w = orientation[3]
             # glpt = TransformerROS.transformPose("odom", goalpose)
-            self.turn_goals.append(goalpose)
+            self.turn_goals[2] = goalpose
 
     def UpdateArucoU(self, marker_pose):
 
@@ -330,7 +342,7 @@ class NavPlanner():
     def main(self):
         rospy.init_node('waypoint_accumulator_publisher', anonymous=True)
         self.movebase_client = actionlib.SimpleActionClient('move_base',MoveBaseAction)
-        self.tf_listener = tf.TransformListener(rospy.Duration(20))
+        self.tf_listener = tf.TransformListener(rospy.Duration(200))
         
 
 
@@ -339,6 +351,7 @@ if __name__ == '__main__':
     try:
         node = NavPlanner()
         node.main()
+        r = rospy.Rate(node.rate)
 
         odom_subscriber = rospy.Subscriber('/odom', Odometry, node.odom_update)
 
@@ -353,8 +366,12 @@ if __name__ == '__main__':
         #TODO: change detection list topic
         # detection_sub = rospy.Subscriber('/detection_list', DetectionList, node.UpdateDetections)
 
+        time.sleep(5)
         while not rospy.is_shutdown():
+            # r.sleep()
+            
             node.PickAWaypoint()
+            
 
         rospy.spin()
 
