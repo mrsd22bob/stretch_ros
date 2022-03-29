@@ -50,6 +50,8 @@ class NavPlanner():
 
         self.insight_aruco = PoseStamped()
 
+        self.insight_aruco_odom = PoseStamped()
+
         self.aruco_update_dist_threshold = 0.2
 
         self.explore_goal = PoseStamped()
@@ -89,9 +91,22 @@ class NavPlanner():
         if self.mode == 'explore':
 
             if self.explore_goal:
+
+                for test in range(500):
+                    try:
+                        print("Initializing")
+                        self.tf_listener.waitForTransform("/base_link", "/odom", rospy.Time.now(), rospy.Duration(1))
+                # aruco_odom = self.tf_listener.transformPose("/odom", self.insight_aruco)
+                        aruco_base_new = self.tf_listener.transformPose("/base_link", self.insight_aruco_odom)
+                        break
+                    except:
+                        print("Waiting for TF to become available")
+                        pass
+                # print(test)
+                print(aruco_base_new)
                 
                 try:
-                    if (self.insight_aruco.pose.position.x - self.explore_goal.pose.position.x) > 0.3:
+                    if (aruco_base_new.pose.position.x - self.explore_goal.pose.position.x) > 0.3:
                         print("Exploring")
                         goalpt = self.tf_listener.transformPose("/odom", self.explore_goal)
                         goal = MoveBaseGoal()
@@ -103,7 +118,7 @@ class NavPlanner():
                         self.movebase_client.send_goal(goal)
                         wait = self.movebase_client.wait_for_result()
 
-                    elif (self.insight_aruco.pose.position.x - self.explore_goal.pose.position.x) <= 0.3 and (self.insight_aruco.pose.position.x - self.explore_goal.pose.position.x) > 0:
+                    elif (aruco_base_new.pose.position.x - self.explore_goal.pose.position.x) <= 0.3 and (self.insight_aruco.pose.position.x - self.explore_goal.pose.position.x) > 0:
                         print("Sending Aruco Goal")
 
                         for i in range(3):
@@ -113,6 +128,8 @@ class NavPlanner():
                             goal.target_pose.header.stamp = rospy.Time.now()
                             goal.target_pose.pose.position = goalpt.pose.position
                             goal.target_pose.pose.orientation = goalpt.pose.orientation
+
+                            print("Sent Aruco point ", i)
 
                             self.movebase_client.send_goal(goal)
                             wait = self.movebase_client.wait_for_result()
@@ -166,13 +183,14 @@ class NavPlanner():
         tmpgoal.pose.position.y = 0.2*self.pot_lines.points[1].y
         tmpgoal.pose.position.z = 0
         orientation = quaternion_from_euler(0,0,rad)
+        orientation = orientation/np.linalg.norm(orientation)
         tmpgoal.pose.orientation.x = orientation[0]
         tmpgoal.pose.orientation.y = orientation[1]
         tmpgoal.pose.orientation.z = orientation[2]
         tmpgoal.pose.orientation.w = orientation[3]
         self.explore_goal = tmpgoal
 
-        print(self.explore_goal)
+        # print(self.explore_goal)
         # TransformerROS.transformPose("odom", tmpgoal)
 
 
@@ -184,6 +202,10 @@ class NavPlanner():
         # if np.linalg.norm([marker_pose.pose.position.x - self.insight_aruco.pose.position.x, marker_pose.pose.position.y - self.insight_aruco.pose.position.y, marker_pose.pose.position.z - self.insight_aruco.pose.position.z])>self.aruco_update_dist_threshold:
             #if true - store self.current_aruco_loc = aruco_marker.position
         self.insight_aruco = marker_pose  ## Always will be in base_link
+
+        self.tf_listener.waitForTransform("/odom", "/base_link", rospy.Time.now(), rospy.Duration(5))
+        self.insight_aruco_odom = self.tf_listener.transformPose("/odom", marker_pose)
+        # aruco_base_new = self.tf_listener.transformPose("/base_link", aruco_odom)
 
         if self.pot_line:
             self.turn_goals = []
@@ -308,7 +330,7 @@ class NavPlanner():
     def main(self):
         rospy.init_node('waypoint_accumulator_publisher', anonymous=True)
         self.movebase_client = actionlib.SimpleActionClient('move_base',MoveBaseAction)
-        self.tf_listener = tf.TransformListener()
+        self.tf_listener = tf.TransformListener(rospy.Duration(20))
         
 
 

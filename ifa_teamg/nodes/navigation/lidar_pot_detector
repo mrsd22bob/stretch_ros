@@ -41,19 +41,19 @@ class LidarDetector():
 
         self.pc_baselink = None
 
-        self.cluster_threshold = 0.008
+        self.cluster_threshold = 0.01
 
         self.centroids = []
 
-        self.cluster_max_points = 20
+        self.cluster_max_points = 30
 
-        self.cluster_min_points = 10
+        self.cluster_min_points = 20
 
         self.pot_radius_max_threshold = 0.20
 
         self.pot_radius_min_threshold = 0.1
 
-        self.pot_spacing = 0.3
+        self.pot_spacing = 0.2
 
         self.waypoints = []
 
@@ -80,9 +80,9 @@ class LidarDetector():
         
         # print(pc_baselink_box.header.frame_id)
         xyz = rnp.point_cloud2.pointcloud2_to_xyz_array(pc_baselink_box).T
-        self.lookuptime = rospy.Time.now()
+        self.lookuptime = pc_baselink_box.header.stamp
         # print(rospy.get_time())
-        lookuptime = self.lookuptime
+        # lookuptime = self.lookuptime
 
         # print(xyz.shape)
 
@@ -90,7 +90,7 @@ class LidarDetector():
         xyz_selfx = xyz[:,index_to_keep_x].reshape(3,-1)
 
         # print(xyz_selfx.shape)
-        self.find_centers(xyz_selfx, lookuptime)
+        self.find_centers(xyz_selfx, pc_baselink_box.header.stamp)
 
     def odom_update(self, odom_feedback):
 
@@ -98,7 +98,7 @@ class LidarDetector():
         self.y_current = odom_feedback.pose.pose.position.y
 
     
-    def find_centers(self, xyz, lookuptime):
+    def find_centers(self, xyz, cloudstamp):
 
         if xyz.shape[1] == 0:
             return
@@ -126,6 +126,8 @@ class LidarDetector():
             else:
                 #Check if number of points in already collected cluster are > 3, if not continue 
                 if cluster.shape[1] < self.cluster_min_points:
+                    cluster = np.asarray(xyz[:,i])
+                    cluster = cluster.reshape((-1,1))
                     continue
 
                 #If there are > 3 points, compute centroid and add to centroid collection
@@ -144,12 +146,12 @@ class LidarDetector():
                             self.temp_pot_locs.append([cent_x, cent_y, 0])
 
                         elif np.linalg.norm([self.temp_pot_locs[-1][0] - cent_x, self.centroids[-1][1] - cent_y]) > self.pot_spacing:
-                            print("here")
+                            # print("here")
                             self.temp_pot_locs.append([cent_x, cent_y, 0])
 
 
                         # self.tf2_listener.waitForTransform('/odom', '/base_link', lookuptime, rospy.Duration(1))
-                        stamped_transform =  self.tf2_buffer.lookup_transform("odom", "base_link", lookuptime, timeout_ros)
+                        stamped_transform =  self.tf2_buffer.lookup_transform("odom", "base_link", cloudstamp, timeout_ros)
                         p1_to_p2_mat = rnp.numpify(stamped_transform.transform)
                         # print("P1P2",p1_to_p2_mat.shape)
                         pot_loc = np.matmul(p1_to_p2_mat,np.array([cent_x, cent_y, 0, 1]))
@@ -219,6 +221,7 @@ class LidarDetector():
                 #Restart cluster with current point
                 cluster = np.asarray(xyz[:,i])
                 cluster = cluster.reshape((-1,1))
+                # print(self.centroids)
 
         self.marker_publisher.publish(self.pot_array)
 
@@ -233,7 +236,7 @@ class LidarDetector():
 
             pts = np.array(self.temp_pot_locs)
 
-            print(pts.shape)
+            # print(pts.shape)
 
             coeffs = np.polyfit(pts[:,0], pts[:,1], 1)
 
@@ -243,7 +246,7 @@ class LidarDetector():
 
             vec = PotLine()
 
-            vec.header.stamp = rospy.Time.now()
+            vec.header.stamp = self.lookuptime
             vec.header.frame_id = "base_link"
 
             pt1 = Point()
