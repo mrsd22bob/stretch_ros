@@ -19,6 +19,10 @@ class Manipulation_pr3(hm.HelloNode):
 	def __init__(self):
 		hm.HelloNode.__init__(self)
 		self.pose = None
+		self.reach = False
+
+		self.offset_y = 0
+		self.offset_z = 0
 
 	#def turnOnManipulationMode(self):
 	#    pass
@@ -55,9 +59,13 @@ class Manipulation_pr3(hm.HelloNode):
 	# 	self.trajectory_client.wait_for_result()
 	# 	self.move_to_pose(pose_desired_y)
 	# 	self.trajectory_client.wait_for_result()
-	## then, the robot needs to stop. 
+	# # then, the robot needs to stop. 
 
 	def moveWristToMarker(self, pose):
+
+		self.reach = False
+		self.offset_y = -0.230 #changing this to positive may be a way to calibrate the offset. 
+		self.offset_z = 0.122#0.160#0.210 #0.185 #0.250 #robot's arm is lower than the center of aruco marker.. why?
 		
 		# transform 'aruco_frame:base_link' to 'base_link'-> might want to try link_lift? no
 		target_frame = 'base_link' 
@@ -65,28 +73,32 @@ class Manipulation_pr3(hm.HelloNode):
 
 		transform = self.tf_buffer.lookup_transform(target_frame, pose.header.frame_id[1:], pose.header.stamp)
 		pose_transformed = tf2_geometry_msgs.do_transform_pose(pose, transform)
-
-		# returns trans:xyz orien:xyzw
-		offset_y = -0.230 #changing this to positive may be a way to calibrate the offset. 
-		offset_z = 0.122#0.160#0.210 #0.185 #0.250 #robot's arm is lower than the center of aruco marker.. why?
-		print(pose_transformed)
-		pose_z = pose_transformed.pose.position.z - offset_z
-		pose_y = -(pose_transformed.pose.position.y - offset_y)
-
+		# print(pose_transformed)
+		# make threshold for the pose to check if it should be updated as a new pose or not 
+		pose_z = pose_transformed.pose.position.z - self.offset_z
+		pose_y = -(pose_transformed.pose.position.y - self.offset_y)
 
 		pose_arm_retract = {'wrist_extension' : 0.0}
 		pose_desired = {'joint_lift' : pose_z, 'wrist_extension' : pose_y }
-		print(pose_desired)
 		pose_desired_z = {'joint_lift' : pose_z}
 		pose_desired_y = {'wrist_extension' : pose_y}
-		self.move_to_pose(pose_arm_retract)
-		self.move_to_pose(pose_desired_z)
-		self.trajectory_client.wait_for_result()
-		self.move_to_pose(pose_desired_y)
-		self.trajectory_client.wait_for_result()
-		#then, the robot needs to stop. 
-		# pose_desired = {'joint_lift' : pose_z, 'wrist_extension' : pose_y }
+		print(pose_desired)
 		
+		while self.reach != True:	
+			# Actuate the arm 
+			self.move_to_pose(pose_arm_retract)
+			self.trajectory_client.wait_for_result()
+			
+			self.move_to_pose(pose_desired_z)
+			self.trajectory_client.wait_for_result()
+			
+			self.move_to_pose(pose_desired_y)
+			self.trajectory_client.wait_for_result()
+			
+			self.reach = True
+			#then, the robot needs to stop. 
+			# pose_desired = {'joint_lift' : pose_z, 'wrist_extension' : pose_y }
+			
 
 	# def moveToolToMarker(poses):
 	#   pass
@@ -96,8 +108,9 @@ class Manipulation_pr3(hm.HelloNode):
 		hm.HelloNode.main(self, 'manipulation_pr3', 'manipulation_pr3', wait_for_first_pointcloud=False)
 		self.tf_buffer = tf2_ros.Buffer(rospy.Duration(10))
 		self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
-		self.wrist_sub = rospy.Subscriber("/aruco_simple/pose", PoseStamped, self.moveWristToMarker, queue_size=1)
 		# self.wrist_sub = rospy.Subscriber("BoundingBoxTopic", PoseStamped, self.moveWristToBoundingBox, queue_size=1)
+		self.wrist_sub = rospy.Subscriber("/aruco_simple/pose", PoseStamped, self.moveWristToMarker, queue_size=1)
+
 
 
 if __name__ == '__main__':
