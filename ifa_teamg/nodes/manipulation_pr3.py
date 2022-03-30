@@ -26,10 +26,11 @@ class Manipulation_pr3(hm.HelloNode):
 		self.pose_arm_retract = {'wrist_extension' : 0.0}
 		self.pose_lift = 0
 		self.pose_arm = 0
-
 		self.pose_desired = {'joint_lift' : self.pose_lift, 'wrist_extension' : self.pose_arm}
 		self.pose_desired_lift = {'joint_lift' : self.pose_lift}
 		self.pose_desired_arm = {'wrist_extension' : self.pose_arm}
+
+		self.target_frame = None
 
 	#def turnOnManipulationMode(self):
 	#    pass
@@ -70,18 +71,17 @@ class Manipulation_pr3(hm.HelloNode):
 
 	def moveWristToBoundingBox(self, pose):
 
-
-		self.offset_y = -0.150 #changing this to positive may be a way to calibrate the offset. 
-		self.offset_z = -0.250 #-0.122#0.160#0.210 #0.185  #robot's arm is lower than the center of aruco marker.. why?
-
 		self.move_to_pose(self.pose_arm_retract)
-		self.trajectory_client.wait_for_result()	
+		self.trajectory_client.wait_for_result()
+		self.pose = self.pose_arm_retract
+		self.offset_y = -0.150 # should be as far as where enough FOV of wrist camera can be achieved
+		self.offset_z = -0.250 #-0.122#0.160#0.210 #0.185  #robot's arm is lower than the center of aruco marker.. why?
 		
 		# transform 'aruco_frame:base_link' to 'base_link'-> might want to try link_lift? no
-		target_frame = 'base_link' 
+		self.target_frame = 'base_link' 
 		print(pose.header.frame_id[1:])
 
-		transform = self.tf_buffer.lookup_transform(target_frame, pose.header.frame_id[1:], pose.header.stamp)
+		transform = self.tf_buffer.lookup_transform(self.target_frame, pose.header.frame_id[1:], pose.header.stamp)
 		pose_transformed = tf2_geometry_msgs.do_transform_pose(pose, transform)
 		print(pose_transformed)
 		# make threshold for the pose to check if it should be updated as a new pose or not 
@@ -89,23 +89,23 @@ class Manipulation_pr3(hm.HelloNode):
 		self.pose_lift = (pose_transformed.pose.position.z + self.offset_z)
 		self.pose_arm = -(pose_transformed.pose.position.y - self.offset_y)
 
-		
-		pose_desired = {'joint_lift' : self.pose_lift, 'wrist_extension' : self.pose_arm}
-		pose_desired_z = {'joint_lift' : self.pose_lift}
-		pose_desired_y = {'wrist_extension' : self.pose_arm}
-		print(pose_desired)
-		
-		if self.reach != True:	
-			# Actuate the arm 
+		print(self.pose_desired)
+		#if wrist_extension is at arm_retracted position
+		#	then move to pose
+		# else (meaning when the arm is not retracted)
+		# 	then do nothing 
+		# 	
+		# if self.reach != True:	
+		# 	# Actuate the arm 
 
 			
-			self.move_to_pose(pose_desired_z)
-			self.trajectory_client.wait_for_result()
+		# 	self.move_to_pose(self.pose_desired_lift)
+		# 	self.trajectory_client.wait_for_result()
 			
-			self.move_to_pose(pose_desired_y)
-			self.trajectory_client.wait_for_result()
-			self.reach = True
-			break
+		# 	self.move_to_pose(self.pose_desired_arm)
+		# 	self.trajectory_client.wait_for_result()
+		# 	self.reach = True
+		# 	break
 
 			
 			#then, the robot needs to stop. 
