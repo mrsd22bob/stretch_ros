@@ -63,7 +63,7 @@ class LidarDetector():
 
         self.temp_pot_locs = []
 
-        self.offset = 0.5
+        self.offset = 0.6
 
         self.pot_array = MarkerArray()
 

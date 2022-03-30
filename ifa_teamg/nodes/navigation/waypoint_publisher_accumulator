@@ -44,7 +44,7 @@ class NavPlanner():
 
         self.waypoints = []
 
-        self.pot_line = []
+        self.pot_lines = []
 
         self.aruco_count_1 = 0
 
@@ -61,9 +61,13 @@ class NavPlanner():
 
         self.waypoint_tracking_list = []
 
-        self.turn_goals = [None, None, None]
+        self.turn_goals = [None, None, None, None]
+
+        self.turn_goals_odom = [None, None, None, None]
 
         self.mode = 'explore'
+
+        self.aruco_new = False
 
         #Line parameters in the bse_link after processing LiDAR
         self.m = None
@@ -101,9 +105,10 @@ class NavPlanner():
                     now = rospy.Time.now()
                     # for test in range(500):
                         # try:
-                    print(self.insight_aruco_odom)
-                    print("Initializing")
-                    self.tf_listener.waitForTransform("/base_link", "/odom", now, rospy.Duration(3))
+                    # print(self.insight_aruco_odom)
+                    self.insight_aruco_odom.header.stamp = now
+                    # print("Initializing")
+                    self.tf_listener.waitForTransform("/base_link", "/odom", now, rospy.Duration(1))
                     # aruco_odom = self.tf_listener.transformPose("/odom", self.insight_aruco)
                     aruco_base_new = self.tf_listener.transformPose("/base_link", self.insight_aruco_odom)
                             # break
@@ -111,7 +116,7 @@ class NavPlanner():
                             # print("Waiting for TF to become available")
                             # pass
                     # print(test)
-                    print(aruco_base_new)
+                    # print(aruco_base_new)
 
                     if (aruco_base_new.pose.position.x - self.explore_goal.pose.position.x) > 0.3:
                         print("Exploring")
@@ -125,39 +130,42 @@ class NavPlanner():
                         self.movebase_client.send_goal(goal)
                         wait = self.movebase_client.wait_for_result()
                 
-                    elif (aruco_base_new.pose.position.x - self.explore_goal.pose.position.x) <= 0.3 and (self.insight_aruco.pose.position.x - self.explore_goal.pose.position.x) > 0:
+                    elif (aruco_base_new.pose.position.x - self.explore_goal.pose.position.x) <= 0.3 and (self.insight_aruco.pose.position.x - self.explore_goal.pose.position.x) > 0 and self.aruco_new==True:
                         print("Sending Aruco Goal")
 
-                        for i in range(3):
-                            goalpt = self.tf_listener.transformPose("/odom", self.turn_goals[i])
+                        self.aruco_new = False
+
+                        for i in range(4):
+                            # goalpt = self.tf_listener.transformPose("/odom", self.turn_goals_odom[i])
                             goal = MoveBaseGoal()
                             goal.target_pose.header.frame_id = "odom"
                             goal.target_pose.header.stamp = rospy.Time.now()
-                            goal.target_pose.pose.position = goalpt.pose.position
-                            goal.target_pose.pose.orientation = goalpt.pose.orientation
+                            # goal.target_pose.pose.position = goalpt.pose.position
+                            # goal.target_pose.pose.orientation = goalpt.pose.orientation
+
+                            goal.target_pose.pose.position = self.turn_goals_odom[i].pose.position
+                            goal.target_pose.pose.orientation = self.turn_goals_odom[i].pose.orientation
 
                             print("Sent Aruco point ", i)
 
                             self.movebase_client.send_goal(goal)
                             wait = self.movebase_client.wait_for_result()
 
-                    else:
-                        # print("Exploring")
-                        goalpt = self.tf_listener.transformPose("/odom", self.explore_goal)
-                        # print("After listener")
-                        goal = MoveBaseGoal()
-                        goal.target_pose.header.frame_id = "odom"
-                        goal.target_pose.header.stamp = rospy.Time.now()
-                        goal.target_pose.pose.position = goalpt.pose.position
-                        goal.target_pose.pose.orientation = goalpt.pose.orientation
-                        # print("a")
+                else:
+                    print("Exploring")
+                    goalpt = self.tf_listener.transformPose("/odom", self.explore_goal)
+                    # print("After listener")
+                    goal = MoveBaseGoal()
+                    goal.target_pose.header.frame_id = "odom"
+                    goal.target_pose.header.stamp = rospy.Time.now()
+                    goal.target_pose.pose.position = goalpt.pose.position
+                    goal.target_pose.pose.orientation = goalpt.pose.orientation
+                    # print("a")
 
-                        if not (self.explore_goal.pose.position.x ==0 and self.explore_goal.pose.position.y ==0):
-                            print("Sending Goal")
-                            self.movebase_client.send_goal(goal)
-                            wait = self.movebase_client.wait_for_result()
-                        else:
-                            pass
+                    if not (self.explore_goal.pose.position.x ==0 and self.explore_goal.pose.position.y ==0):
+                        print("Sending Goal")
+                        self.movebase_client.send_goal(goal)
+                        wait = self.movebase_client.wait_for_result()
                         # print("b")
 
                 # except:
@@ -172,8 +180,12 @@ class NavPlanner():
 
 
     def UpdateLine(self, potLines):
-        self.pot_lines = potLines
 
+        print("In pot line updates")
+        
+        self.pot_lines = potLines
+        
+        # print(self.pot_lines)
         # print(self.pot_lines.points[0].x)
 
         self.m = (self.pot_lines.points[1].y - self.pot_lines.points[0].y)/(self.pot_lines.points[1].x - self.pot_lines.points[0].x)
@@ -205,36 +217,42 @@ class NavPlanner():
         #id=59
         # should be incremented here
 
+        self.aruco_new = True
+
         #check if new aruco_marker position is out of threshold of self.current_aruco_pos
         # if np.linalg.norm([marker_pose.pose.position.x - self.insight_aruco.pose.position.x, marker_pose.pose.position.y - self.insight_aruco.pose.position.y, marker_pose.pose.position.z - self.insight_aruco.pose.position.z])>self.aruco_update_dist_threshold:
             #if true - store self.current_aruco_loc = aruco_marker.position
         self.insight_aruco = marker_pose  ## Always will be in base_link
 
         # print(marker_pose.header.stamp)
-        print("ENDARUCO START")
-        self.tf_listener.waitForTransform("/odom", "/base_link", marker_pose.header.stamp, rospy.Duration(1))
-        self.insight_aruco_odom = self.tf_listener.transformPose("/odom", marker_pose)
-        print("ENDARUCO ODOM CONVERTER")
+        # print("ENDARUCO START")
+        self.tf_listener.waitForTransform("odom", "base_link", marker_pose.header.stamp, rospy.Duration(1))
+        self.insight_aruco_odom = self.tf_listener.transformPose("odom", marker_pose)
+        # print("ENDARUCO ODOM CONVERTER")
         # aruco_base_new = self.tf_listener.transformPose("/base_link", aruco_odom)
-        print(self.insight_aruco_odom)
-        if self.pot_line:
+        # print(self.insight_aruco_odom)
+        # print("Before aruco goal creation")
+        # print(self.pot_lines)
+        if self.pot_lines:
             # self.turn_goals = []
 
-            print("We're in aruco end goal creation")
+            # print("We're in aruco end goal creation")
 
             # arpt = TransformerROS.transformPose("base_link", self.insight_aruco)
             a = self.insight_aruco.pose.position.x
             b = self.insight_aruco.pose.position.y
 
             A = np.array([[self.m, -1],[1, self.m]],)
-            b = np.array([self.c, self.m*b + a])
+            b = np.array([-self.c, self.m*b + a])
 
             X = np.linalg.solve(A,b)
             rad = np.arctan(self.m)
 
             goalpose = PoseStamped()
             goalpose.header.stamp = self.insight_aruco.header.stamp
-            goalpose.header.frame_id = '/base_link'
+            goalpose.header.frame_id = 'base_link'
+
+            aruco1_baselink = np.array([[np.cos(rad), -np.sin(rad), X[0]],[np.sin(rad), np.cos(rad), X[1]], [0, 0, 1]])
 
             goalpose.pose.position.x = X[0]
             goalpose.pose.position.y = X[1]
@@ -246,9 +264,15 @@ class NavPlanner():
             goalpose.pose.orientation.w = orientation[3]
             # glpt = TransformerROS.transformPose("odom", goalpose)
             self.turn_goals[0] = goalpose
+            self.turn_goals_odom[0] = self.tf_listener.transformPose("odom", goalpose)
 
-            goalpose.pose.position.x = X[0] + 0.5
-            goalpose.pose.position.y = X[1] - 0.5
+            xcon = np.matmul(aruco1_baselink,np.array([0.5,-0.5,1]))
+
+            # print(aruco1_baselink)
+	        # print(xcon)
+
+            goalpose.pose.position.x = xcon[0]
+            goalpose.pose.position.y = xcon[1]
             goalpose.pose.position.z =  0
             orientation = quaternion_from_euler(0,0,rad - np.pi/2)
             goalpose.pose.orientation.x = orientation[0]
@@ -257,9 +281,12 @@ class NavPlanner():
             goalpose.pose.orientation.w = orientation[3]
             # glpt = TransformerROS.transformPose("odom", goalpose)
             self.turn_goals[1] = goalpose
+            self.turn_goals_odom[1] = self.tf_listener.transformPose("odom", goalpose)
 
-            goalpose.pose.position.x = X[0]
-            goalpose.pose.position.y = X[1] - 1
+            xcon = np.matmul(aruco1_baselink,np.array([0,-1.2,1]))
+
+            goalpose.pose.position.x = xcon[0]
+            goalpose.pose.position.y = xcon[1]
             goalpose.pose.position.z =  0
             orientation = quaternion_from_euler(0,0,rad - np.pi)
             goalpose.pose.orientation.x = orientation[0]
@@ -268,10 +295,28 @@ class NavPlanner():
             goalpose.pose.orientation.w = orientation[3]
             # glpt = TransformerROS.transformPose("odom", goalpose)
             self.turn_goals[2] = goalpose
+            self.turn_goals_odom[2] = self.tf_listener.transformPose("odom", goalpose)
+
+            xcon = np.matmul(aruco1_baselink,np.array([-0.3,-1.2,1]))
+
+            goalpose.pose.position.x = xcon[0]
+            goalpose.pose.position.y = xcon[1]
+            goalpose.pose.position.z =  0
+            orientation = quaternion_from_euler(0,0,rad - np.pi)
+            goalpose.pose.orientation.x = orientation[0]
+            goalpose.pose.orientation.y = orientation[1]
+            goalpose.pose.orientation.z = orientation[2]
+            goalpose.pose.orientation.w = orientation[3]
+            # glpt = TransformerROS.transformPose("odom", goalpose)
+            self.turn_goals[3] = goalpose
+            self.turn_goals_odom[3] = self.tf_listener.transformPose("odom", goalpose)
+            
 
     def UpdateArucoU(self, marker_pose):
 
         # should be incremented here
+
+        self.aruco_new = True
 
         #check if new aruco_marker position is out of threshold of self.current_aruco_pos
         # if np.linalg.norm([marker_pose.pose.position.x - self.insight_aruco.pose.position.x, marker_pose.pose.position.y - self.insight_aruco.pose.position.y, marker_pose.pose.position.z - self.insight_aruco.pose.position.z])>self.aruco_update_dist_threshold:
@@ -286,7 +331,7 @@ class NavPlanner():
             b = self.insight_aruco.pose.position.y
 
             A = np.array([[self.m, -1],[1, self.m]],)
-            b = np.array([self.c, self.m*b + a])
+            b = np.array([-self.c, self.m*b + a])
 
             X = np.linalg.solve(A,b)
             rad = np.arctan(self.m)
@@ -342,7 +387,7 @@ class NavPlanner():
     def main(self):
         rospy.init_node('waypoint_accumulator_publisher', anonymous=True)
         self.movebase_client = actionlib.SimpleActionClient('move_base',MoveBaseAction)
-        self.tf_listener = tf.TransformListener(rospy.Duration(200))
+        self.tf_listener = tf.TransformListener(rospy.Duration(100))
         
 
 
