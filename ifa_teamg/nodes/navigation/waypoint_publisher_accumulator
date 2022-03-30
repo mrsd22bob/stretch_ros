@@ -130,10 +130,8 @@ class NavPlanner():
                         self.movebase_client.send_goal(goal)
                         wait = self.movebase_client.wait_for_result()
                 
-                    elif (aruco_base_new.pose.position.x - self.explore_goal.pose.position.x) <= 0.3 and (self.insight_aruco.pose.position.x - self.explore_goal.pose.position.x) > 0 and self.aruco_new==True:
+                    elif ((aruco_base_new.pose.position.x - self.explore_goal.pose.position.x) <= 0.3 and (self.insight_aruco.pose.position.x - self.explore_goal.pose.position.x) > 0 and self.aruco_new==True):
                         print("Sending Aruco Goal")
-
-                        self.aruco_new = False
 
                         for i in range(4):
                             # goalpt = self.tf_listener.transformPose("/odom", self.turn_goals_odom[i])
@@ -151,21 +149,23 @@ class NavPlanner():
                             self.movebase_client.send_goal(goal)
                             wait = self.movebase_client.wait_for_result()
 
-                else:
-                    print("Exploring")
-                    goalpt = self.tf_listener.transformPose("/odom", self.explore_goal)
-                    # print("After listener")
-                    goal = MoveBaseGoal()
-                    goal.target_pose.header.frame_id = "odom"
-                    goal.target_pose.header.stamp = rospy.Time.now()
-                    goal.target_pose.pose.position = goalpt.pose.position
-                    goal.target_pose.pose.orientation = goalpt.pose.orientation
-                    # print("a")
+                        self.aruco_new = False
 
-                    if not (self.explore_goal.pose.position.x ==0 and self.explore_goal.pose.position.y ==0):
-                        print("Sending Goal")
-                        self.movebase_client.send_goal(goal)
-                        wait = self.movebase_client.wait_for_result()
+                    else:
+                        print("Exploring")
+                        goalpt = self.tf_listener.transformPose("/odom", self.explore_goal)
+                        # print("After listener")
+                        goal = MoveBaseGoal()
+                        goal.target_pose.header.frame_id = "odom"
+                        goal.target_pose.header.stamp = rospy.Time.now()
+                        goal.target_pose.pose.position = goalpt.pose.position
+                        goal.target_pose.pose.orientation = goalpt.pose.orientation
+                        # print("a")
+
+                        if not (self.explore_goal.pose.position.x ==0 and self.explore_goal.pose.position.y ==0):
+                            print("Sending Goal")
+                            self.movebase_client.send_goal(goal)
+                            wait = self.movebase_client.wait_for_result()
                         # print("b")
 
                 # except:
@@ -181,7 +181,7 @@ class NavPlanner():
 
     def UpdateLine(self, potLines):
 
-        print("In pot line updates")
+        # print("In pot line updates")
         
         self.pot_lines = potLines
         
