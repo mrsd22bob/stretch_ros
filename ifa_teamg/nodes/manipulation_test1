@@ -20,7 +20,7 @@ class Manipulation_t1(hm.HelloNode):
 		
 
 		#self.random_p1 = {'wrist_extension':2.0, 'joint_lift': 2.0}	#44.5in, 30in
-		self.random_p2 = {'wrist_extension':0.1, 'joint_lift': 0.5}    #4.5in, 10in
+		self.random_p2 = {'wrist_extension':0.5, 'joint_lift': 0.5}    #4.5in, 10in
 
 
 	
