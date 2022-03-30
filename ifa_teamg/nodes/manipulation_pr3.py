@@ -23,6 +23,13 @@ class Manipulation_pr3(hm.HelloNode):
 
 		self.offset_y = 0
 		self.offset_z = 0
+		self.pose_arm_retract = {'wrist_extension' : 0.0}
+		self.pose_lift = 0
+		self.pose_arm = 0
+
+		self.pose_desired = {'joint_lift' : self.pose_lift, 'wrist_extension' : self.pose_arm}
+		self.pose_desired_lift = {'joint_lift' : self.pose_lift}
+		self.pose_desired_arm = {'wrist_extension' : self.pose_arm}
 
 	#def turnOnManipulationMode(self):
 	#    pass
@@ -63,9 +70,12 @@ class Manipulation_pr3(hm.HelloNode):
 
 	def moveWristToBoundingBox(self, pose):
 
-		self.reach = False
+
 		self.offset_y = -0.150 #changing this to positive may be a way to calibrate the offset. 
 		self.offset_z = -0.250 #-0.122#0.160#0.210 #0.185  #robot's arm is lower than the center of aruco marker.. why?
+
+		self.move_to_pose(self.pose_arm_retract)
+		self.trajectory_client.wait_for_result()	
 		
 		# transform 'aruco_frame:base_link' to 'base_link'-> might want to try link_lift? no
 		target_frame = 'base_link' 
@@ -76,29 +86,28 @@ class Manipulation_pr3(hm.HelloNode):
 		print(pose_transformed)
 		# make threshold for the pose to check if it should be updated as a new pose or not 
 
+		self.pose_lift = (pose_transformed.pose.position.z + self.offset_z)
+		self.pose_arm = -(pose_transformed.pose.position.y - self.offset_y)
 
-	
-		pose_z = (pose_transformed.pose.position.z + self.offset_z)
-		pose_y = -(pose_transformed.pose.position.y - self.offset_y)
-
-		pose_arm_retract = {'wrist_extension' : 0.0}
-		pose_desired = {'joint_lift' : pose_z, 'wrist_extension' : pose_y }
-		pose_desired_z = {'joint_lift' : pose_z}
-		pose_desired_y = {'wrist_extension' : pose_y}
+		
+		pose_desired = {'joint_lift' : self.pose_lift, 'wrist_extension' : self.pose_arm}
+		pose_desired_z = {'joint_lift' : self.pose_lift}
+		pose_desired_y = {'wrist_extension' : self.pose_arm}
 		print(pose_desired)
 		
-		while self.reach != True:	
+		if self.reach != True:	
 			# Actuate the arm 
-			self.move_to_pose(pose_arm_retract)
-			self.trajectory_client.wait_for_result()
+
 			
 			self.move_to_pose(pose_desired_z)
 			self.trajectory_client.wait_for_result()
 			
 			self.move_to_pose(pose_desired_y)
 			self.trajectory_client.wait_for_result()
-			
 			self.reach = True
+			break
+
+			
 			#then, the robot needs to stop. 
 			# pose_desired = {'joint_lift' : pose_z, 'wrist_extension' : pose_y }
 			
