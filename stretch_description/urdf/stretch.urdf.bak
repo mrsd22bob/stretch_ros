@@ -2,12 +2,12 @@
 <robot name="stretch_description" version="1.0">
   <link name="tool_link">
     <inertial>
-      <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
+      <origin rpy="0.0 0.0 0.0" xyz="-0.017022913273 0.0131410320934 -0.0371614759485"/>
       <mass value="0.102736408077"/>
       <inertia ixx="0.000222763102429" ixy="2.51302014149e-11" ixz="4.37326121568e-14" iyy="0.000224402348762" iyz="7.5615508449e-14" izz="9.89236786802e-06"/>
     </inertial>
     <visual>
-      <origin rpy="0.0 0.0 0.0" xyz="-0.17 0.14 -0.0"/>
+      <origin rpy="0.0 0.0 0.0" xyz="-0.017022913273 0.0131410320934 -0.0371614759485"/>
       <geometry>
         <mesh filename="package://stretch_description/meshes/tool_link.STL"/>
       </geometry>
@@ -22,8 +22,8 @@
       </geometry>
     </collision>
   </link>
-  <joint name="tool_link" type="fixed">
-    <origin rpy="-3.1416 -2.5445e-16 4.71238898038" xyz="0.0 0.0 -0.038"/>
+  <joint name="tool" type="fixed">
+    <origin rpy="3.14159 0.0 -1.5708" xyz="0.0 0.0 -0.038"/>
     <axis xyz="0.0 0.0 0.0"/>
     <parent link="link_wrist_yaw"/>
     <child link="tool_link"/>

@@ -7,7 +7,7 @@
     name="tool_link">
     <inertial>
       <origin
-        xyz="0 0 0"
+        xyz="-0.017022913273 0.0131410320934 -0.0371614759485"
         rpy="0 0 0" />
       <mass
         value="0.102736408076944" />
@@ -44,11 +44,11 @@
     </collision>
   </link>
   <joint
-    name="tool_link"
+    name="tool"
     type="fixed">
     <origin
       xyz="0 0 -0.038"
-      rpy="-3.1416 -2.5445E-16 4.71238898038469" />
+      rpy="3.14159 0.0 -1.5708" />
     <parent
       link="link_wrist_yaw" />
     <child
