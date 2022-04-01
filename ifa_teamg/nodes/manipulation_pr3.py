@@ -2,6 +2,7 @@
 
 from cv2 import transform
 import rospy
+import numpy as np
 from std_msgs.msg import String
 from std_srvs.srv import Trigger, TriggerRequest, TriggerResponse
 from sensor_msgs.msg import JointState
@@ -18,31 +19,30 @@ class Manipulation_pr3(hm.HelloNode):
    
 	def __init__(self):
 		hm.HelloNode.__init__(self)
-		self.pose = None
-		self.reach = False
+		
+		self.marker_position = np.empty((20,2))
+		self.avg_marker_position = None
 
-		self.offset_y = 0
-		self.offset_z = 0
-		self.pose_arm_retract = {'wrist_extension' : 0.0}
-		self.pose_lift = 0
-		self.pose_arm = 0
-		self.pose_desired = {'joint_lift' : self.pose_lift, 'wrist_extension' : self.pose_arm}
-		self.pose_desired_lift = {'joint_lift' : self.pose_lift}
-		self.pose_desired_arm = {'wrist_extension' : self.pose_arm}
+		self.offset_y = None
+		self.offset_z = None
+		self.pose_lift = None
+		self.pose_arm = None
+
+		self.init_pose = {'joint_lift' : 0.5, 'wrist_extension' : 0}	
+		# self.pose_arm_retract = {'wrist_extension' : 0.0}
 
 		self.target_frame = None
 
+		self.arrivedBoundingBox = False
+		self.arrivedMarker = False
 	#def turnOnManipulationMode(self):
 	#    pass
 
 	# def move_to_initial_configuration(self):
-	# 	initial_pose = {'wrist_extension': 0.01,
-	# 					'joint_lift': 0.5,}
-
 	# 	rospy.loginfo('Move to the initial position.')
-	# 	self.move_to_pose(initial_pose)
+	# 	self.move_to_pose(self.init_pose)
 
-	# def moveWristTOBoundingBox(self, pose):
+	# def moveWristToMarker(self, pose):
 	# 	target_frame = 'base_link' 
 	# 	print(pose.header.frame_id[1:])
 
@@ -71,11 +71,11 @@ class Manipulation_pr3(hm.HelloNode):
 
 	def moveWristToBoundingBox(self, pose):
 
-		self.move_to_pose(self.pose_arm_retract)
-		self.trajectory_client.wait_for_result()
-		self.pose = self.pose_arm_retract
-		self.offset_y = -0.150 # should be as far as where enough FOV of wrist camera can be achieved
-		self.offset_z = -0.250 #-0.122#0.160#0.210 #0.185  #robot's arm is lower than the center of aruco marker.. why?
+		if self.arrivedBoundingBox == True:
+			return 
+
+		self.move_to_pose(self.init_pose)
+		self.trajectory_client.wait_for_result()			
 		
 		# transform 'aruco_frame:base_link' to 'base_link'-> might want to try link_lift? no
 		self.target_frame = 'base_link' 
@@ -84,36 +84,44 @@ class Manipulation_pr3(hm.HelloNode):
 		transform = self.tf_buffer.lookup_transform(self.target_frame, pose.header.frame_id[1:], pose.header.stamp)
 		pose_transformed = tf2_geometry_msgs.do_transform_pose(pose, transform)
 		print(pose_transformed)
-		# make threshold for the pose to check if it should be updated as a new pose or not 
 
-		self.pose_lift = (pose_transformed.pose.position.z + self.offset_z)
-		self.pose_arm = -(pose_transformed.pose.position.y - self.offset_y)
+		# print(type(pose_transformed.pose.position.z))
 
-		print(self.pose_desired)
-		#if wrist_extension is at arm_retracted position
-		#	then move to pose
-		# else (meaning when the arm is not retracted)
-		# 	then do nothing 
-		# 	
-		# if self.reach != True:	
-		# 	# Actuate the arm 
-
+		temp_z = pose_transformed.pose.position.z
+		temp_y = pose_transformed.pose.position.y		
+		
+		for i in range(20):
+			for j in range(2):
+				if j % 2 ==0:
+					self.marker_position[i,j] = temp_z
+				else:
+					self.marker_position[i,j] = temp_y
 			
-		# 	self.move_to_pose(self.pose_desired_lift)
-		# 	self.trajectory_client.wait_for_result()
-			
-		# 	self.move_to_pose(self.pose_desired_arm)
-		# 	self.trajectory_client.wait_for_result()
-		# 	self.reach = True
-		# 	break
+		self.avg_marker_position = np.average(self.marker_position, axis=0)
+		self.avg_marker_position = self.avg_marker_position.tolist()
 
-			
-			#then, the robot needs to stop. 
-			# pose_desired = {'joint_lift' : pose_z, 'wrist_extension' : pose_y }
-			
+		# print(type(self.avg_marker_position[0]))
+		self.offset_y = -0.150 # should be as far as where enough FOV of wrist camera can be achieved
+		self.offset_z = -0.250 #-0.122#0.160#0.210 #0.185  #robot's arm is lower than the center of aruco marker.. why?	
+		
+		# self.move_to_pose({'joint_lift' :pose_transformed.pose.position.z + self.offset_z})
 
-	# def moveToolToMarker(poses):
-	#   pass
+		
+		self.pose_lift = (self.avg_marker_position[0] + self.offset_z)
+		self.pose_arm = -(self.avg_marker_position[1] - self.offset_y)
+		self.pose_desired = {'joint_lift' : self.pose_lift, 'wrist_extension' : self.pose_arm}
+		self.pose_desired_lift = {'joint_lift' : self.pose_lift}
+		self.pose_desired_arm = {'wrist_extension' : self.pose_arm}
+
+
+		self.move_to_pose(self.pose_desired_lift)
+		self.trajectory_client.wait_for_result()	
+		self.move_to_pose(self.pose_desired_arm)
+		self.trajectory_client.wait_for_result()
+
+		self.arrivedBoundingBox = True
+		#publish "goal complete"
+			
 
 	def main(self):
 		#rospy.init_node("manipulation_pr3", anonymous=True)
