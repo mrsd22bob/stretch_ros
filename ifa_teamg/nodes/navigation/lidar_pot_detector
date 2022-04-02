@@ -1,0 +1,345 @@
+#!/usr/bin/env python
+
+from re import X
+
+from cv2 import line
+import rospy
+from std_srvs.srv import Trigger, TriggerRequest
+from sensor_msgs.msg import JointState, PointCloud2, LaserScan
+from control_msgs.msg import FollowJointTrajectoryGoal
+from trajectory_msgs.msg import JointTrajectoryPoint
+from nav_msgs.msg import Odometry
+from geometry_msgs.msg import Twist, PoseStamped, Point, Pose
+from visualization_msgs.msg import Marker, MarkerArray
+from ifa_teamg.msg import PotLine
+
+from move_base_msgs.msg import MoveBaseActionGoal
+
+#for quaternion tranformation from Euler to Quaternion
+from tf.transformations import quaternion_from_euler
+
+from scipy import optimize
+
+import math
+import ros_numpy as rnp
+# from ros_numpy import point_cloud2
+import numpy as np
+
+import tf2_ros
+
+import laser_geometry.laser_geometry as lg
+import matplotlib.pyplot as plt
+
+
+class LidarDetector():
+
+    def __init__(self):
+
+        self.rate = 10.0
+
+        self.rotation_angle = -math.pi/2  # In radians
+
+        self.pc_baselink = None
+
+        self.cluster_threshold = 0.01
+
+        self.centroids = []
+
+        self.cluster_max_points = 30
+
+        self.cluster_min_points = 20
+
+        self.pot_radius_max_threshold = 0.20
+
+        self.pot_radius_min_threshold = 0.1
+
+        self.pot_spacing = 0.2
+
+        self.waypoints = []
+
+        self.safe_dist = 0.35
+
+        self.pot_line = PotLine()
+
+        self.temp_pot_locs = []
+
+        self.offset = 0.6
+
+        self.pot_array = MarkerArray()
+
+        #pub
+        self.marker_publisher = rospy.Publisher("/pots", MarkerArray, queue_size=1)
+
+        self.vector_pub = rospy.Publisher("/guide_vector_base", PotLine, queue_size=1)
+
+        self.line_marker_pub = rospy.Publisher("/guide_line_marker", Marker, queue_size=1)
+
+    def process_cloud(self, pc_baselink_box):
+
+        # print("Cloud Processing Call")
+        
+        # print(pc_baselink_box.header.frame_id)
+        xyz = rnp.point_cloud2.pointcloud2_to_xyz_array(pc_baselink_box).T
+        self.lookuptime = pc_baselink_box.header.stamp
+        # print(rospy.get_time())
+        # lookuptime = self.lookuptime
+
+        # print(xyz.shape)
+
+        index_to_keep_x = np.where((xyz[0,:] > 0))
+        xyz_selfx = xyz[:,index_to_keep_x].reshape(3,-1)
+
+        # print(xyz_selfx.shape)
+        self.find_centers(xyz_selfx, pc_baselink_box.header.stamp)
+
+    def odom_update(self, odom_feedback):
+
+        self.x_current = odom_feedback.pose.pose.position.x
+        self.y_current = odom_feedback.pose.pose.position.y
+
+    
+    def find_centers(self, xyz, cloudstamp):
+
+        if xyz.shape[1] == 0:
+            return
+
+        cluster = np.asarray(xyz[:,0])
+        cluster = cluster.reshape((-1,1))
+
+        if xyz.shape[1] >= 20:
+            self.temp_pot_locs = []
+
+        for i in range(1,xyz.shape[1]): 
+
+            # print(np.linalg.norm([xyz[0,i] - xyz[0,i-1], xyz[1,i] - xyz[1,i-1]]))  
+   
+            if np.linalg.norm([xyz[0,i] - xyz[0,i-1], xyz[1,i] - xyz[1,i-1]]) < self.cluster_threshold and cluster.shape[1] < self.cluster_max_points:
+
+                cluster = np.hstack((cluster, xyz[:,i].reshape((-1,1))))
+
+                # print("Here")
+                
+
+                # print(np.linalg.norm([xyz[0,i] - xyz[0,i-1], xyz[1,i] - xyz[1,i-1]]))
+                # print(cluster)
+            
+            else:
+                #Check if number of points in already collected cluster are > 3, if not continue 
+                if cluster.shape[1] < self.cluster_min_points:
+                    cluster = np.asarray(xyz[:,i])
+                    cluster = cluster.reshape((-1,1))
+                    continue
+
+                #If there are > 3 points, compute centroid and add to centroid collection
+                elif cluster.shape[1] <= self.cluster_max_points:
+
+                    #Best fit arc and corresponding cetroid
+                    [cent_x, cent_y, R_xy] = find_centroids(cluster)
+
+                    # print(R_xy)
+
+                    if R_xy < self.pot_radius_max_threshold and R_xy > self.pot_radius_min_threshold:
+
+                        timeout_ros = rospy.Duration(1)
+
+                        if len(self.temp_pot_locs)==0:
+                            self.temp_pot_locs.append([cent_x, cent_y, 0])
+
+                        elif np.linalg.norm([self.temp_pot_locs[-1][0] - cent_x, self.centroids[-1][1] - cent_y]) > self.pot_spacing:
+                            # print("here")
+                            self.temp_pot_locs.append([cent_x, cent_y, 0])
+
+
+                        # self.tf2_listener.waitForTransform('/odom', '/base_link', lookuptime, rospy.Duration(1))
+                        stamped_transform =  self.tf2_buffer.lookup_transform("odom", "base_link", cloudstamp, timeout_ros)
+                        p1_to_p2_mat = rnp.numpify(stamped_transform.transform)
+                        # print("P1P2",p1_to_p2_mat.shape)
+                        pot_loc = np.matmul(p1_to_p2_mat,np.array([cent_x, cent_y, 0, 1]))
+
+                        # print(pot_loc)
+
+                        if len(self.centroids) == 0:
+                            self.centroids.append([pot_loc[0], pot_loc[1], 0, R_xy])
+
+                            # print(len(self.centroids))
+
+                            marker = Marker()
+
+                            marker.header.frame_id = "/odom"
+                            marker.id = 1
+                            marker.type = marker.SPHERE
+                            marker.action = marker.ADD
+                            marker.scale.x = 0.2
+                            marker.scale.y = 0.2
+                            marker.scale.z = 0.2
+                            marker.color.a = 1.0
+                            marker.color.r = 1.0
+                            marker.color.g = 1.0
+                            marker.color.b = 0.0
+                            marker.pose.orientation.w = 1.0
+                            marker.pose.position.x = pot_loc[0]
+                            marker.pose.position.y = pot_loc[1]
+                            marker.pose.position.z = 0
+
+                            self.pot_array.markers.append(marker)
+
+                            # print(np.linalg.norm(np.array(self.centroids)[:,0:2] - np.array(pot_loc)[0:2]))
+                        
+                        elif np.min(np.linalg.norm(np.array(self.centroids)[:,0:2] - np.array(pot_loc)[0:2], axis=1)) > self.pot_spacing:
+                            a = np.array(self.centroids)[:,0:2] - np.array(pot_loc)[0:2]
+                            # print(a.shape)
+                            # print(np.linalg.norm(np.array(self.centroids)[:,0:2] - np.array(pot_loc)[0:2], axis=1))
+                            # print(np.min(np.linalg.norm(np.array(self.centroids)[:,0:2] - np.array(pot_loc)[0:2], axis=1)))
+                            self.centroids.append([pot_loc[0], pot_loc[1], 0, R_xy])
+
+                            # print(self.centroids)
+
+                            marker = Marker()
+
+                            marker.header.frame_id = "/odom"
+                            marker.id = len(self.centroids) + 1
+                            marker.type = marker.SPHERE
+                            marker.action = marker.ADD
+                            marker.scale.x = 0.2
+                            marker.scale.y = 0.2
+                            marker.scale.z = 0.2
+                            marker.color.a = 1.0
+                            marker.color.r = 1.0
+                            marker.color.g = 1.0
+                            marker.color.b = 0.0
+                            marker.pose.orientation.w = 1.0
+                            marker.pose.position.x = pot_loc[0]
+                            marker.pose.position.y = pot_loc[1]
+                            marker.pose.position.z = 0
+
+                            self.pot_array.markers.append(marker)                          
+
+                        # print(self.waypoints)
+
+                        # print("Waypoints added succesfully")
+                    
+                #Restart cluster with current point
+                cluster = np.asarray(xyz[:,i])
+                cluster = cluster.reshape((-1,1))
+                # print(self.centroids)
+
+        self.marker_publisher.publish(self.pot_array)
+
+        self.send_vector()
+
+        if self.centroids == []:
+            print("No centroids found!")
+
+    def send_vector(self):
+
+        if len(self.temp_pot_locs)>=2:
+
+            pts = np.array(self.temp_pot_locs)
+
+            # print(pts.shape)
+
+            coeffs = np.polyfit(pts[:,0], pts[:,1], 1)
+
+            m = coeffs[0]
+            rad = np.arctan(m)
+            c = coeffs[1] + (self.offset/np.cos(rad))
+
+            vec = PotLine()
+
+            vec.header.stamp = self.lookuptime
+            vec.header.frame_id = "base_link"
+
+            pt1 = Point()
+
+            pt1.x = 0
+            pt1.y = c
+            pt1.z = 0
+            vec.points.append(pt1)
+
+            pt2 = Point()
+
+            pt2.x = 1*np.cos(rad)
+            pt2.y = c + 1*np.sin(rad)
+            pt2.z = 0
+            vec.points.append(pt2)
+
+            self.vector_pub.publish(vec)
+
+            marker = Marker()
+            marker.header.frame_id = "base_link"
+            marker.type = 0
+            marker.action = 0
+            marker.color.r = 1.0
+            marker.color.g = 0.0
+            marker.color.b = 0.0
+            marker.color.a = 1.0
+            marker.scale.x = 0.1
+            marker.scale.y = 0.1
+            marker.scale.z = 0.1
+            marker.frame_locked = False
+
+            marker.points.append(pt1)
+            marker.points.append(pt2) 
+
+            marker.ns = "guide_line"
+            
+            
+            self.line_marker_pub.publish(marker)
+
+    def StartNode(self):
+        #Initializing Lidar Pot Detector Node
+        rospy.init_node('lidar_pot_detector', anonymous=True)
+
+        # Creating Transform Listener
+        self.tf2_buffer = tf2_ros.Buffer()
+        self.tf2_listener = tf2_ros.TransformListener(self.tf2_buffer)
+
+        print("Lidar Pot Detector Node Started Successfully")
+
+def find_centroids(cluster):
+
+    x = cluster[0,:]
+    y = cluster[1,:]
+
+    x_m = np.average(x)
+    y_m = np.average(y)
+
+    center_estimate = x_m, y_m
+    center_2, ier = optimize.leastsq(f_2, center_estimate, args=(cluster))
+
+    xc_2, yc_2 = center_2
+    Ri_2       = calc_R(*center_2, cluster=cluster)
+    R_2        = Ri_2.mean()
+    residu_2   = sum((Ri_2 - R_2)**2)
+
+    return xc_2, yc_2, R_2
+
+
+def calc_R(xc, yc, cluster):
+    """ calculate the distance of each 2D points from the center (xc, yc) """
+    x = cluster[0,:]
+    y = cluster[1,:]
+    return np.sqrt((x-xc)**2 + (y-yc)**2)
+
+
+def f_2(c, cluster):
+    """ calculate the algebraic distance between the data points and the mean circle centered at c=(xc, yc) """
+    Ri = calc_R(*c, cluster = cluster)
+    # print(Ri - Ri.mean())
+    return Ri - Ri.mean()
+
+
+if __name__ == '__main__':
+
+    try:
+        node = LidarDetector()
+        node.StartNode()
+
+        lidar_subscriber = rospy.Subscriber('/laser_cloud_baselink', PointCloud2, node.process_cloud)
+
+        odom_subscriber = rospy.Subscriber('/odom', Odometry, node.odom_update)
+
+        rospy.spin()
+
+    except KeyboardInterrupt:
+        rospy.loginfo('interrupt received bro!!! Gotcha!')
