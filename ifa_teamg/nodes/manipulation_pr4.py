@@ -118,22 +118,22 @@ class Manipulation_pr4(hm.HelloNode):
 
         # print(type(pose_transformed.pose.position.z))
 
-        temp_z = pose_transformed.pose.position.z
-        temp_y = pose_transformed.pose.position.y       
+        temp_lift = pose_transformed.pose.position.z
+        temp_arm = pose_transformed.pose.position.y       
         received_position = np.empty((20,2))
 
         for i in range(20):
             for j in range(2):
                 if j % 2 ==0:
-                    received_position[i,j] = temp_z
+                    received_position[i,j] = temp_lift
                 else:
-                    received_position[i,j] = temp_y
+                    received_position[i,j] = temp_arm
             
         self.avg_boundingbox_position = np.average(received_position, axis=0)
         self.avg_boundingbox_position = self.avg_boundingbox_position.tolist()
 
         # print(type(self.avg_marker_position[0]))
-        self.offset_y = -0.150 # should be as far as where enough FOV of wrist camera can be achieved
+        self.offset_y = -0.250 - 0.250 # should be as far as where enough FOV of wrist camera can be achieved
         self.offset_z = -0.250 #-0.122#0.160#0.210 #0.185  #robot's arm is lower than the center of aruco marker.. why? 
         
         # self.move_to_pose({'joint_lift' :pose_transformed.pose.position.z + self.offset_z})
@@ -170,16 +170,16 @@ class Manipulation_pr4(hm.HelloNode):
 
         # print(type(pose_transformed.pose.position.z))
 
-        temp_z = pose_transformed.pose.position.z
-        temp_y = pose_transformed.pose.position.y       
+        temp_lift = pose_transformed.pose.position.z
+        temp_arm = pose_transformed.pose.position.y       
         received_position = np.empty((20,2))
 
         for i in range(20):
             for j in range(2):
                 if j % 2 ==0:
-                    received_position[i,j] = temp_z
+                    received_position[i,j] = temp_lift
                 else:
-                    received_position[i,j] = temp_y
+                    received_position[i,j] = temp_arm
             
         avg_marker_position = np.average(received_position, axis=0)
         avg_marker_position = avg_marker_position.tolist()
