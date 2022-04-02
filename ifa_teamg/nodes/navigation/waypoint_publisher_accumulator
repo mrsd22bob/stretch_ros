@@ -52,7 +52,7 @@ class NavPlanner():
 
         self.insight_aruco = None
 
-        self.insight_aruco_odom = PoseStamped()
+        self.insight_aruco_odom = None
 
         self.aruco_update_dist_threshold = 0.2
 
@@ -95,14 +95,14 @@ class NavPlanner():
     #def display_test_stats()
 
     def PickAWaypoint(self):
-
+        now = rospy.Time.now()
         if self.mode == 'explore':
 
             if self.explore_goal:
                 # print("Here_expl")
                 if self.insight_aruco_odom:
-                    # print("Here_aruc")
-                    now = rospy.Time.now()
+                    print("Aruco Exists")
+                    
                     # for test in range(500):
                         # try:
                     # print(self.insight_aruco_odom)
@@ -119,8 +119,14 @@ class NavPlanner():
                     # print(aruco_base_new)
 
                     if (aruco_base_new.pose.position.x - self.explore_goal.pose.position.x) > 0.3:
-                        print("Exploring")
-                        goalpt = self.tf_listener.transformPose("/odom", self.explore_goal)
+                        print("Exploring and Checking Aruco")
+                        # print("Time now in explore checking", self.explore_goal.header.stamp)
+                        try:
+                            goalpt = self.tf_listener.transformPose("/odom", self.explore_goal)
+                        except:
+                            self.explore_goal.header.stamp = now
+                            goalpt = self.tf_listener.transformPose("/odom", self.explore_goal)
+
                         goal = MoveBaseGoal()
                         goal.target_pose.header.frame_id = "odom"
                         goal.target_pose.header.stamp = rospy.Time.now()
@@ -143,29 +149,38 @@ class NavPlanner():
 
                             goal.target_pose.pose.position = self.turn_goals_odom[i].pose.position
                             goal.target_pose.pose.orientation = self.turn_goals_odom[i].pose.orientation
-
+                            
+                            print("The goal sent to nav is:", goal)
                             print("Sent Aruco point ", i)
 
                             self.movebase_client.send_goal(goal)
                             wait = self.movebase_client.wait_for_result()
+                            
+                            print("Completed Aruco goal ", i)
 
                         self.aruco_new = False
 
-                    else:
-                        print("Exploring")
-                        goalpt = self.tf_listener.transformPose("/odom", self.explore_goal)
-                        # print("After listener")
-                        goal = MoveBaseGoal()
-                        goal.target_pose.header.frame_id = "odom"
-                        goal.target_pose.header.stamp = rospy.Time.now()
-                        goal.target_pose.pose.position = goalpt.pose.position
-                        goal.target_pose.pose.orientation = goalpt.pose.orientation
-                        # print("a")
+                else:
+                    print("Exploring but no aruco in sight")
 
-                        if not (self.explore_goal.pose.position.x ==0 and self.explore_goal.pose.position.y ==0):
-                            print("Sending Goal")
-                            self.movebase_client.send_goal(goal)
-                            wait = self.movebase_client.wait_for_result()
+                    try:
+                            goalpt = self.tf_listener.transformPose("/odom", self.explore_goal)
+                    except:
+                            self.explore_goal.header.stamp = now
+                            goalpt = self.tf_listener.transformPose("/odom", self.explore_goal)
+                    
+                    # print("After listener")
+                    goal = MoveBaseGoal()
+                    goal.target_pose.header.frame_id = "odom"
+                    goal.target_pose.header.stamp = rospy.Time.now()
+                    goal.target_pose.pose.position = goalpt.pose.position
+                    goal.target_pose.pose.orientation = goalpt.pose.orientation
+                    # print("a")
+
+                    if not (self.explore_goal.pose.position.x ==0 and self.explore_goal.pose.position.y ==0):
+                        print("Sending Goal")
+                        self.movebase_client.send_goal(goal)
+                        wait = self.movebase_client.wait_for_result()
                         # print("b")
 
                 # except:
@@ -197,6 +212,7 @@ class NavPlanner():
         # print("In Lidar Point Update")
 
         tmpgoal.header.stamp = self.pot_lines.header.stamp
+        # print("Timestamp of last explore goal input", self.pot_lines.header.stamp)
         tmpgoal.header.frame_id = '/base_link'
         tmpgoal.pose.position.x = 0.2*self.pot_lines.points[1].x
         tmpgoal.pose.position.y = 0.2*self.pot_lines.points[1].y
@@ -216,6 +232,8 @@ class NavPlanner():
     def UpdateArucoEnd(self, marker_pose):
         #id=59
         # should be incremented here
+
+        # print("Updating Aruco End")
 
         self.aruco_new = True
 
@@ -266,10 +284,10 @@ class NavPlanner():
             self.turn_goals[0] = goalpose
             self.turn_goals_odom[0] = self.tf_listener.transformPose("odom", goalpose)
 
-            xcon = np.matmul(aruco1_baselink,np.array([0.5,-0.5,1]))
+            xcon = np.matmul(aruco1_baselink,np.array([0.6,-0.7,1]))
 
             # print(aruco1_baselink)
-	        # print(xcon)
+            print(xcon)
 
             goalpose.pose.position.x = xcon[0]
             goalpose.pose.position.y = xcon[1]
@@ -284,6 +302,7 @@ class NavPlanner():
             self.turn_goals_odom[1] = self.tf_listener.transformPose("odom", goalpose)
 
             xcon = np.matmul(aruco1_baselink,np.array([0,-1.2,1]))
+            print(xcon)
 
             goalpose.pose.position.x = xcon[0]
             goalpose.pose.position.y = xcon[1]
@@ -297,7 +316,8 @@ class NavPlanner():
             self.turn_goals[2] = goalpose
             self.turn_goals_odom[2] = self.tf_listener.transformPose("odom", goalpose)
 
-            xcon = np.matmul(aruco1_baselink,np.array([-0.3,-1.2,1]))
+            xcon = np.matmul(aruco1_baselink,np.array([-0.4,-1.2,1]))
+            print(xcon)
 
             goalpose.pose.position.x = xcon[0]
             goalpose.pose.position.y = xcon[1]
@@ -310,13 +330,17 @@ class NavPlanner():
             # glpt = TransformerROS.transformPose("odom", goalpose)
             self.turn_goals[3] = goalpose
             self.turn_goals_odom[3] = self.tf_listener.transformPose("odom", goalpose)
-            
 
+            print(xcon)
+
+            
     def UpdateArucoU(self, marker_pose):
 
         # should be incremented here
 
         self.aruco_new = True
+
+        # print("Updating Aruco U")
 
         #check if new aruco_marker position is out of threshold of self.current_aruco_pos
         # if np.linalg.norm([marker_pose.pose.position.x - self.insight_aruco.pose.position.x, marker_pose.pose.position.y - self.insight_aruco.pose.position.y, marker_pose.pose.position.z - self.insight_aruco.pose.position.z])>self.aruco_update_dist_threshold:
@@ -389,7 +413,7 @@ class NavPlanner():
             self.turn_goals[2] = goalpose
             self.turn_goals_odom[2] = self.tf_listener.transformPose("odom", goalpose)
 
-            xcon = np.matmul(aruco1_baselink,np.array([-0.3,0.1,1]))  
+            xcon = np.matmul(aruco1_baselink,np.array([-0.4,0.1,1]))  
 
             goalpose.pose.position.x = xcon[0]
             goalpose.pose.position.y = xcon[1]
@@ -432,10 +456,10 @@ if __name__ == '__main__':
         pot_line_sub = rospy.Subscriber('/guide_vector_base', PotLine, node.UpdateLine)
 
         #TODO: change aruco topic to be in baselink!!!!!!!!
-        aruco_sub = rospy.Subscriber('/aruco_simple/pose1', PoseStamped, node.UpdateArucoEnd)
+        # aruco_sub = rospy.Subscriber('/aruco_simple/pose1', PoseStamped, node.UpdateArucoEnd)
 
         #TODO: change aruco topic to be in baselink!!!!!!!!!!!
-        aruco_sub = rospy.Subscriber('/aruco_simple/pose2', PoseStamped, node.UpdateArucoU)
+        aruco_sub = rospy.Subscriber('/aruco_simple/pose2', PoseStamped, node.UpdateArucoEnd)
 
         #TODO: change detection list topic
         # detection_sub = rospy.Subscriber('/detection_list', DetectionList, node.UpdateDetections)
