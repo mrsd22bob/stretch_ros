@@ -120,7 +120,7 @@
   <!-- -->
 
   <include file="$(find realsense2_camera)/launch/rs_camera.launch" >
-  <arg name="camera" value="cam_1" />
+  <arg name="camera" value="head_camera" />
   <arg name="serial_no" value="033422070537" />
   </include>
 
