@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
+
 from logging.config import valid_ident
 from re import X
 
@@ -32,6 +34,53 @@ import tf
 
 import actionlib
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
+
+from behavioral_planner.srv import *
+
+navigate_key = 9
+navigate_over_key = 10
+explore_key = 11
+explore_over_key = 12
+process_over_key = 56
+
+navigate_flag = 0
+explore_flag = 0
+process_over = 0
+reached_end_flag = 0
+reached_goal_flag = 0
+
+def bp_to_nav_handle(req):
+    if(req.req==explore_key):
+        print("NAV: Exploration begins")
+        global explore_flag
+        explore_flag = 1
+        return bpServiceResponse(req.req)
+    if(req.req==navigate_key):
+        print("NAV: Navigation begins")
+        global navigate_flag
+        navigate_flag = 1
+        return bpServiceResponse(req.req)
+    if(req.req==process_over_key):
+        print("NAV: Process over, exiting")
+        global process_over
+        process_over = 1
+        return bpServiceResponse(req.req)
+    else:
+        return bpServiceResponse(0)
+
+def bp_to_nav_server():
+    # rospy.init_node('bp_to_nav_server')
+    s = rospy.Service('bp_to_nav', bpService, bp_to_nav_handle)
+    print("NAV: Ready")
+
+def nodes_to_bp_client(key):
+    rospy.wait_for_service('nodes_to_bp')
+    try:
+        req = rospy.ServiceProxy('nodes_to_bp', bpService)
+        resp = req(key)
+        return resp.reply
+    except rospy.ServiceException as e:
+        print("Service call failed: %s"%e)
 
 
 class NavPlanner():
@@ -69,6 +118,8 @@ class NavPlanner():
 
         self.aruco_new = False
 
+        self.turn_count = 0
+
         #Line parameters in the bse_link after processing LiDAR
         self.m = None
         self.c = None
@@ -96,8 +147,10 @@ class NavPlanner():
 
     def PickAWaypoint(self):
         now = rospy.Time.now()
-        if self.mode == 'explore':
-
+        if self.turn_count ==4:
+            global reached_end_flag
+            reached_end_flag=1
+        elif self.mode == 'explore':
             if self.explore_goal:
                 # print("Here_expl")
                 if self.insight_aruco_odom:
@@ -159,9 +212,12 @@ class NavPlanner():
                             print("Completed Aruco goal ", i)
 
                         self.aruco_new = False
+                        self.turn_count+=1
 
                 else:
                     print("Exploring but no aruco in sight")
+                    print("Incremening turn count for BP integration testing")
+                    self.turn_count+=1
 
                     try:
                             goalpt = self.tf_listener.transformPose("/odom", self.explore_goal)
@@ -185,8 +241,13 @@ class NavPlanner():
 
                 # except:
                 #     pass
-        else:
-            print("No Waypoints or Pots to Track")
+            else:
+                print("No Waypoints or Pots to Track")
+        
+        elif self.mode == 'navigate':
+            global reached_goal_flag
+            reached_goal_flag=1
+
 
     def odom_update(self, odom_feedback):
 
@@ -449,6 +510,9 @@ if __name__ == '__main__':
     try:
         node = NavPlanner()
         node.main()
+        
+        bp_to_nav_server()
+
         r = rospy.Rate(node.rate)
 
         odom_subscriber = rospy.Subscriber('/odom', Odometry, node.odom_update)
@@ -456,22 +520,47 @@ if __name__ == '__main__':
         pot_line_sub = rospy.Subscriber('/guide_vector_base', PotLine, node.UpdateLine)
 
         #TODO: change aruco topic to be in baselink!!!!!!!!
-        # aruco_sub = rospy.Subscriber('/aruco_simple/pose1', PoseStamped, node.UpdateArucoEnd)
+        # aruco_sub = rospy.Subscriber('/aruco_head/pose1', PoseStamped, node.UpdateArucoEnd)
 
         #TODO: change aruco topic to be in baselink!!!!!!!!!!!
-        aruco_sub = rospy.Subscriber('/aruco_simple/pose2', PoseStamped, node.UpdateArucoEnd)
+        aruco_sub = rospy.Subscriber('/aruco_head/pose2', PoseStamped, node.UpdateArucoEnd)
 
         #TODO: change detection list topic
         # detection_sub = rospy.Subscriber('/detection_list', DetectionList, node.UpdateDetections)
 
         time.sleep(5)
-        while not rospy.is_shutdown():
-            # r.sleep()
+
+        while(1):
+            print("hi")
+            if(explore_flag==1 or navigate_flag==1):
+                node.PickAWaypoint()
             
-            node.PickAWaypoint()
+                if(explore_flag and reached_end_flag):
+                    #reset explore
+                    #dont reset reached end because that means env is traversed
+                    explore_flag=0
+                    #send explore done to BP
+                    if(nodes_to_bp_client(explore_over_key)==explore_over_key):
+                        print("NAV: Exploration over")  
+
+                if(navigate_flag and reached_goal_flag):
+                    #reset navigate
+                    reached_goal_flag=0
+                    navigate_flag=0
+                    #send done to BP
+                    if(nodes_to_bp_client(navigate_over_key)==navigate_over_key):
+                        print("NAV: Navigation over")
+              
+            if(process_over == 1):
+                break
+
+        # while not rospy.is_shutdown():
+        #     # r.sleep()
+            
+        #     node.PickAWaypoint()
             
 
-        rospy.spin()
+        # rospy.spin()
 
     except KeyboardInterrupt:
         rospy.loginfo('interrupt received bro!!! Gotcha!')

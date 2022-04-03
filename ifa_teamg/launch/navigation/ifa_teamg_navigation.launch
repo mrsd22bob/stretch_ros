@@ -4,12 +4,13 @@
 
 
   <!-- STRETCH DRIVER -->
-  <param name="/stretch_driver/broadcast_odom_tf" type="bool" value="true"/>
+  <!-- <param name="/stretch_driver/broadcast_odom_tf" type="bool" value="true"/>
   <param name="/stretch_driver/mode" type="string" value="navigation" />
-  <include file="$(find stretch_core)/launch/stretch_driver.launch" pass_all_args="true"/>
+  <include file="$(find stretch_core)/launch/stretch_driver.launch" pass_all_args="true"/> -->
 
   <!-- RPLIDAR A1 -->
-  <node name="lidar_node" pkg="rplidar_ros" type="rplidarNode" output="screen">
+  <!-- <node name="lidar_node" pkg="rplidar_ros" type="rplidarNode" output="screen"> -->
+  <node name="lidar_node" pkg="rplidar_ros" type="rplidarNode">
     <param name="serial_port"         type="string" value="/dev/hello-lrf"/>
     <param name="serial_baudrate"     type="int"    value="115200"/> 
     <param name="frame_id"            type="string" value="laser"/>
@@ -112,19 +113,20 @@
   </node>
 
   <!-- Pot Detection Node -->
-  <node name="lidar_pot_detector" pkg="ifa_teamg" type="lidar_pot_detector" output="screen" args=''/>
+  <!-- <node name="lidar_pot_detector" pkg="ifa_teamg" type="lidar_pot_detector" output="screen" args=''/> -->
+  <node name="lidar_pot_detector" pkg="ifa_teamg" type="lidar_pot_detector" args=''/>
   <!-- -->
 
   <!-- Waypoint Selector and Publisher -->
-  <!--node name="waypoint_publisher" pkg="ifa_teamg" type="waypoint_publisher_accumulator" output="screen" args=''-->
+  node name="waypoint_publisher" pkg="ifa_teamg" type="waypoint_publisher_accumulator" output="screen" args=''
   <!-- -->
 
-  <include file="$(find realsense2_camera)/launch/rs_camera.launch" >
+  <!-- <include file="$(find realsense2_camera)/launch/rs_camera.launch" >
   <arg name="camera" value="head_camera" />
   <arg name="serial_no" value="033422070537" />
   </include>
 
-  <include file="$(find aruco_ros)/launch/stretch_nav_aruco.launch" />
+  <include file="$(find aruco_ros)/launch/stretch_nav_aruco.launch" /> -->
 
 </launch>
 

@@ -38,10 +38,14 @@
   </node> -->
   <!-- -->
 
-  <node name="dummy_nav" pkg="behavioral_planner" type="dummy_nav.py" output="screen">
-  </node>
+  <!-- NAVIGATION -->
+  <include file="$(find ifa_teamg)/launch/navigation/ifa_teamg_navigation.launch">
+  </include>  
+  <!-- <node name="dummy_nav" pkg="behavioral_planner" type="dummy_nav.py" output="screen"> -->
+  <!-- </node> -->
+  <!-- -->
 
   <!-- RVIZ --> 
-  <node pkg="rviz" type="rviz" name="rviz" args="-d $(find behavioral_planner)/launch/bp.rviz"/>
+  <!--node pkg="rviz" type="rviz" name="rviz" args="-d $(find behavioral_planner)/launch/bp.rviz"/-->
   <!-- -->
 </launch>
