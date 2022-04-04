@@ -147,12 +147,18 @@ class NavPlanner():
 
     def PickAWaypoint(self):
         now = rospy.Time.now()
+        global explore_flag
+        global navigate_flag
+        # if explore_flag:
+        #     self.mode = "explore"
+        # if navigate_flag:
+        #     self.mode = "navigate"
         if self.turn_count ==4:
             global reached_end_flag
             reached_end_flag=1
-        elif self.mode == 'explore':
+        elif explore_flag:
+            print("NAV: Exploring function")
             if self.explore_goal:
-                # print("Here_expl")
                 if self.insight_aruco_odom:
                     print("Aruco Exists")
                     
@@ -245,6 +251,7 @@ class NavPlanner():
                 print("No Waypoints or Pots to Track")
         
         elif self.mode == 'navigate':
+            print("NAV: Navigating function")
             global reached_goal_flag
             reached_goal_flag=1
 
@@ -530,8 +537,7 @@ if __name__ == '__main__':
 
         time.sleep(5)
 
-        while(1):
-            print("hi")
+        while(not rospy.is_shutdown()):
             if(explore_flag==1 or navigate_flag==1):
                 node.PickAWaypoint()
             

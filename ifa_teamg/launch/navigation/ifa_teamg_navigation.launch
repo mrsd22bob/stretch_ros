@@ -118,7 +118,7 @@
   <!-- -->
 
   <!-- Waypoint Selector and Publisher -->
-  node name="waypoint_publisher" pkg="ifa_teamg" type="waypoint_publisher_accumulator" output="screen" args=''
+  <node name="waypoint_publisher" pkg="ifa_teamg" type="waypoint_publisher_accumulator" output="screen" args=''/>
   <!-- -->
 
   <!-- <include file="$(find realsense2_camera)/launch/rs_camera.launch" >

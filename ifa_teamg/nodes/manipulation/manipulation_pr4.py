@@ -223,7 +223,7 @@ if __name__ == '__main__':
         bp_to_man_server() 
         node = Manipulation_pr4()      
         node.main() 
-        while(1):
+        while(not rospy.is_shutdown()):
             if(man_no_op_flag==1):
                 node.wristbb_sub = rospy.Subscriber("/aruco_head/pose3", PoseStamped, node.moveWristToBoundingBox, queue_size=1)
                 #man_no_op

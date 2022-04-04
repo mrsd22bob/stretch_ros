@@ -126,7 +126,7 @@ def auto():
 if __name__ == "__main__":
     nodes_to_bp_server()
 
-    while(1):
+    while(not rospy.is_shutdown()):
         time.sleep(1)
         print("BP:")
         print("1. Exploration")
