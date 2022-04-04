@@ -32,7 +32,7 @@
   <!-- -->
 
   <!-- MANIPULATION -->
-  <node name="manipulation_pr4" pkg="ifa_teamg" type="manipulation_pr4.py" output="screen">
+  <node name="manipulation_pr4" pkg="ifa_teamg" type="manipulation_harvester.py" output="screen">
   </node>
   <!-- <node name="dummy_man" pkg="behavioral_planner" type="dummy_man.py" output="screen">
   </node> -->

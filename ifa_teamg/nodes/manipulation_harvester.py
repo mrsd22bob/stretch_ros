@@ -11,6 +11,8 @@ from sensor_msgs.msg import JointState
 from control_msgs.msg import FollowJointTrajectoryGoal
 from trajectory_msgs.msg import JointTrajectoryPoint
 
+from harvester import harvest
+
 import tf2_ros
 import tf2_geometry_msgs
 from tf2_geometry_msgs import PoseStamped 
@@ -203,6 +205,7 @@ class Manipulation_pr4(hm.HelloNode):
         self.move_to_pose(self.pose_desired_arm)
         self.trajectory_client.wait_for_result()
 
+        harvest()
         # self.arrivedMarker = True
         global man_op_over
         man_op_over = 1
