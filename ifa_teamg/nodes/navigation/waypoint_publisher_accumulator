@@ -56,8 +56,8 @@ class NavPlanner():
 
         self.aruco_update_dist_threshold = 0.2
 
-        self.explore_goal = PoseStamped()
-        self.explore_goal.header.frame_id = 'base_link'
+        # self.explore_goal = PoseStamped()
+        # self.explore_goal.header.frame_id = 'base_link'
 
         self.waypoint_tracking_list = []
 
@@ -97,9 +97,9 @@ class NavPlanner():
     def PickAWaypoint(self):
         now = rospy.Time.now()
         if self.mode == 'explore':
-
             if self.explore_goal:
-                # print("Here_expl")
+                # print(self.explore_goal)
+                print("Here_expl")
                 if self.insight_aruco_odom:
                     print("Aruco Exists")
                     
@@ -196,11 +196,13 @@ class NavPlanner():
 
     def UpdateLine(self, potLines):
 
-        # print("In pot line updates")
+        print("In pot line updates")
+
+        # self.explore_goal = PoseStamped()
         
         self.pot_lines = potLines
         
-        # print(self.pot_lines)
+        print(self.pot_lines)
         # print(self.pot_lines.points[0].x)
 
         self.m = (self.pot_lines.points[1].y - self.pot_lines.points[0].y)/(self.pot_lines.points[1].x - self.pot_lines.points[0].x)
