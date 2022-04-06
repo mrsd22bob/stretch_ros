@@ -7,7 +7,6 @@ Panels:
         - /Global Options1
         - /Status1
         - /Odometry1/Shape1
-        - /TF1
         - /TF1/Frames1
       Splitter Ratio: 0.6117647290229797
     Tree Height: 539
@@ -70,43 +69,43 @@ Visualization Manager:
           Show Axes: false
           Show Trail: false
           Value: true
-        camera_bottom_screw_frame:
+        head_camera_bottom_screw_frame:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        camera_color_frame:
+        head_camera_color_frame:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        camera_color_optical_frame:
+        head_camera_color_optical_frame:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        camera_depth_frame:
+        head_camera_depth_frame:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        camera_depth_optical_frame:
+        head_camera_depth_optical_frame:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        camera_infra1_frame:
+        head_camera_infra1_frame:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        camera_infra1_optical_frame:
+        head_camera_infra1_optical_frame:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        camera_infra2_frame:
+        head_camera_infra2_frame:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        camera_infra2_optical_frame:
+        head_camera_infra2_optical_frame:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        camera_link:
+        head_camera_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
@@ -445,161 +444,29 @@ Visualization Manager:
       Unreliable: false
       Value: true
     - Class: rviz/TF
-      Enabled: true
+      Enabled: false
       Frame Timeout: 15
       Frames:
         All Enabled: false
-        base_link:
-          Value: false
-        camera_bottom_screw_frame:
-          Value: false
-        camera_color_frame:
-          Value: false
-        camera_color_optical_frame:
-          Value: false
-        camera_depth_frame:
-          Value: false
-        camera_depth_optical_frame:
-          Value: false
-        camera_infra1_frame:
-          Value: false
-        camera_infra1_optical_frame:
-          Value: false
-        camera_infra2_frame:
-          Value: false
-        camera_infra2_optical_frame:
-          Value: false
-        camera_link:
-          Value: false
-        laser:
-          Value: false
-        link_arm_l0:
-          Value: true
-        link_arm_l1:
-          Value: false
-        link_arm_l2:
-          Value: false
-        link_arm_l3:
-          Value: false
-        link_arm_l4:
-          Value: false
-        link_aruco_inner_wrist:
-          Value: false
-        link_aruco_left_base:
-          Value: false
-        link_aruco_right_base:
-          Value: false
-        link_aruco_shoulder:
-          Value: false
-        link_aruco_top_wrist:
-          Value: false
-        link_head:
-          Value: false
-        link_head_pan:
-          Value: false
-        link_head_tilt:
-          Value: false
-        link_left_wheel:
-          Value: false
-        link_lift:
-          Value: false
-        link_mast:
-          Value: false
-        link_right_wheel:
-          Value: false
-        link_wrist_yaw:
-          Value: false
-        respeaker_base:
-          Value: false
-        tool_link:
-          Value: false
-        wrist_camera_bottom_screw_frame:
-          Value: false
-        wrist_camera_color_frame:
-          Value: false
-        wrist_camera_color_optical_frame:
-          Value: false
-        wrist_camera_depth_frame:
-          Value: false
-        wrist_camera_depth_optical_frame:
-          Value: false
-        wrist_camera_infra1_frame:
-          Value: false
-        wrist_camera_infra1_optical_frame:
-          Value: false
-        wrist_camera_infra2_frame:
-          Value: false
-        wrist_camera_infra2_optical_frame:
-          Value: false
-        wrist_camera_link:
-          Value: true
       Marker Scale: 1
       Name: TF
       Show Arrows: true
       Show Axes: true
       Show Names: true
       Tree:
-        base_link:
-          laser:
-            {}
-          link_aruco_left_base:
-            {}
-          link_aruco_right_base:
-            {}
-          link_left_wheel:
-            {}
-          link_mast:
-            link_head:
-              link_head_pan:
-                link_head_tilt:
-                  camera_bottom_screw_frame:
-                    camera_link:
-                      camera_color_frame:
-                        camera_color_optical_frame:
-                          {}
-                      camera_depth_frame:
-                        camera_depth_optical_frame:
-                          {}
-                      camera_infra1_frame:
-                        camera_infra1_optical_frame:
-                          {}
-                      camera_infra2_frame:
-                        camera_infra2_optical_frame:
-                          {}
-            link_lift:
-              link_arm_l4:
-                link_arm_l3:
-                  link_arm_l2:
-                    link_arm_l1:
-                      link_arm_l0:
-                        link_aruco_inner_wrist:
-                          {}
-                        link_aruco_top_wrist:
-                          {}
-                        link_wrist_yaw:
-                          tool_link:
-                            {}
-                        wrist_camera_bottom_screw_frame:
-                          wrist_camera_link:
-                            wrist_camera_color_frame:
-                              wrist_camera_color_optical_frame:
-                                {}
-                            wrist_camera_depth_frame:
-                              wrist_camera_depth_optical_frame:
-                                {}
-                            wrist_camera_infra1_frame:
-                              wrist_camera_infra1_optical_frame:
-                                {}
-                            wrist_camera_infra2_frame:
-                              wrist_camera_infra2_optical_frame:
-                                {}
-              link_aruco_shoulder:
-                {}
-            respeaker_base:
-              {}
-          link_right_wheel:
-            {}
+        {}
       Update Interval: 0
+      Value: false
+    - Class: rviz/MarkerArray
+      Enabled: true
+      Marker Topic: /aruco_goal_markers
+      Name: MarkerArray
+      Namespaces:
+        Goal-0: true
+        Goal-1: true
+        Goal-2: true
+        Goal-3: true
+      Queue Size: 100
       Value: true
   Enabled: true
   Global Options:
@@ -629,7 +496,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 0.9179401397705078
+      Distance: 4.064962387084961
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1

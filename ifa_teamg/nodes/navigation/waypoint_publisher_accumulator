@@ -15,6 +15,7 @@ from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Twist, PoseStamped
 from nav_msgs.msg import Path
 from ifa_teamg.msg import PotLine
+from visualization_msgs.msg import MarkerArray, Marker
 
 from move_base_msgs.msg import MoveBaseActionGoal
 
@@ -69,9 +70,13 @@ class NavPlanner():
 
         self.aruco_new = False
 
+        self.allow_aruco_callbacks = True
+
         #Line parameters in the bse_link after processing LiDAR
         self.m = None
         self.c = None
+        
+        self.aruco_goal_array_pub = rospy.Publisher("aruco_goal_markers", MarkerArray, queue_size=1)
 
         #Using the twist for rudimentary motion implementation without using move_base
         # self.twist_msg = Twist()
@@ -99,7 +104,6 @@ class NavPlanner():
         if self.mode == 'explore':
             if self.explore_goal:
                 # print(self.explore_goal)
-                print("Here_expl")
                 if self.insight_aruco_odom:
                     print("Aruco Exists")
                     
@@ -139,6 +143,9 @@ class NavPlanner():
                     elif ((aruco_base_new.pose.position.x - self.explore_goal.pose.position.x) <= 0.3 and (self.insight_aruco.pose.position.x - self.explore_goal.pose.position.x) > 0 and self.aruco_new==True):
                         print("Sending Aruco Goal")
 
+                        self.aruco_new = False
+                        self.allow_aruco_callbacks = False
+
                         for i in range(4):
                             # goalpt = self.tf_listener.transformPose("/odom", self.turn_goals_odom[i])
                             goal = MoveBaseGoal()
@@ -150,15 +157,20 @@ class NavPlanner():
                             goal.target_pose.pose.position = self.turn_goals_odom[i].pose.position
                             goal.target_pose.pose.orientation = self.turn_goals_odom[i].pose.orientation
                             
-                            print("The goal sent to nav is:", goal)
+                            
                             print("Sent Aruco point ", i)
+                            print("The goal sent to nav is:", goal)
 
                             self.movebase_client.send_goal(goal)
                             wait = self.movebase_client.wait_for_result()
                             
                             print("Completed Aruco goal ", i)
 
-                        self.aruco_new = False
+                        self.allow_aruco_callbacks = True
+
+
+                        
+
 
                 else:
                     print("Exploring but no aruco in sight")
@@ -196,13 +208,13 @@ class NavPlanner():
 
     def UpdateLine(self, potLines):
 
-        print("In pot line updates")
+        # print("In pot line updates")
 
         # self.explore_goal = PoseStamped()
         
         self.pot_lines = potLines
         
-        print(self.pot_lines)
+        #print(self.pot_lines)
         # print(self.pot_lines.points[0].x)
 
         self.m = (self.pot_lines.points[1].y - self.pot_lines.points[0].y)/(self.pot_lines.points[1].x - self.pot_lines.points[0].x)
@@ -216,8 +228,8 @@ class NavPlanner():
         tmpgoal.header.stamp = self.pot_lines.header.stamp
         # print("Timestamp of last explore goal input", self.pot_lines.header.stamp)
         tmpgoal.header.frame_id = '/base_link'
-        tmpgoal.pose.position.x = 0.2*self.pot_lines.points[1].x
-        tmpgoal.pose.position.y = 0.2*self.pot_lines.points[1].y
+        tmpgoal.pose.position.x = 0.3*self.pot_lines.points[1].x
+        tmpgoal.pose.position.y = 0.3*self.pot_lines.points[1].y
         tmpgoal.pose.position.z = 0
         orientation = quaternion_from_euler(0,0,rad)
         orientation = orientation/np.linalg.norm(orientation)
@@ -237,197 +249,255 @@ class NavPlanner():
 
         # print("Updating Aruco End")
 
-        self.aruco_new = True
+        if self.allow_aruco_callbacks:
 
-        #check if new aruco_marker position is out of threshold of self.current_aruco_pos
-        # if np.linalg.norm([marker_pose.pose.position.x - self.insight_aruco.pose.position.x, marker_pose.pose.position.y - self.insight_aruco.pose.position.y, marker_pose.pose.position.z - self.insight_aruco.pose.position.z])>self.aruco_update_dist_threshold:
-            #if true - store self.current_aruco_loc = aruco_marker.position
-        self.insight_aruco = marker_pose  ## Always will be in base_link
+            self.aruco_new = True
 
-        # print(marker_pose.header.stamp)
-        # print("ENDARUCO START")
-        self.tf_listener.waitForTransform("odom", "base_link", marker_pose.header.stamp, rospy.Duration(1))
-        self.insight_aruco_odom = self.tf_listener.transformPose("odom", marker_pose)
-        # print("ENDARUCO ODOM CONVERTER")
-        # aruco_base_new = self.tf_listener.transformPose("/base_link", aruco_odom)
-        # print(self.insight_aruco_odom)
-        # print("Before aruco goal creation")
-        # print(self.pot_lines)
-        if self.pot_lines:
-            # self.turn_goals = []
+            # print(marker_pose.header.stamp)
 
-            # print("We're in aruco end goal creation")
+            #check if new aruco_marker position is out of threshold of self.current_aruco_pos
+            # if np.linalg.norm([marker_pose.pose.position.x - self.insight_aruco.pose.position.x, marker_pose.pose.position.y - self.insight_aruco.pose.position.y, marker_pose.pose.position.z - self.insight_aruco.pose.position.z])>self.aruco_update_dist_threshold:
+                #if true - store self.current_aruco_loc = aruco_marker.position
+            self.insight_aruco = marker_pose  ## Always will be in base_link
 
-            # arpt = TransformerROS.transformPose("base_link", self.insight_aruco)
-            a = self.insight_aruco.pose.position.x
-            b = self.insight_aruco.pose.position.y
+            # print(marker_pose.header.stamp)
+            # print("ENDARUCO START")
+            self.tf_listener.waitForTransform("odom", "base_link", marker_pose.header.stamp, rospy.Duration(1))
+            self.insight_aruco_odom = self.tf_listener.transformPose("odom", marker_pose)
+            # print("ENDARUCO ODOM CONVERTER")
+            # aruco_base_new = self.tf_listener.transformPose("/base_link", aruco_odom)
+            # print(self.insight_aruco_odom)
+            # print("Before aruco goal creation")
+            # print(self.pot_lines)
+            if self.pot_lines:
 
-            A = np.array([[self.m, -1],[1, self.m]],)
-            b = np.array([-self.c, self.m*b + a])
+            # if True:
+                
+                goalmarkers = MarkerArray()
+                # self.turn_goals = []
 
-            X = np.linalg.solve(A,b)
-            rad = np.arctan(self.m)
+                # print("We're in aruco end goal creation")
 
-            goalpose = PoseStamped()
-            goalpose.header.stamp = self.insight_aruco.header.stamp
-            goalpose.header.frame_id = 'base_link'
+                # arpt = TransformerROS.transformPose("base_link", self.insight_aruco)
+                a = self.insight_aruco.pose.position.x
+                b = self.insight_aruco.pose.position.y
 
-            aruco1_baselink = np.array([[np.cos(rad), -np.sin(rad), X[0]],[np.sin(rad), np.cos(rad), X[1]], [0, 0, 1]])
+                A = np.array([[self.m, -1],[1, self.m]],)
+                b = np.array([-self.c, self.m*b + a])
 
-            goalpose.pose.position.x = X[0]
-            goalpose.pose.position.y = X[1]
-            goalpose.pose.position.z =  0
-            orientation = quaternion_from_euler(0,0,rad)
-            goalpose.pose.orientation.x = orientation[0]
-            goalpose.pose.orientation.y = orientation[1]
-            goalpose.pose.orientation.z = orientation[2]
-            goalpose.pose.orientation.w = orientation[3]
-            # glpt = TransformerROS.transformPose("odom", goalpose)
-            self.turn_goals[0] = goalpose
-            self.turn_goals_odom[0] = self.tf_listener.transformPose("odom", goalpose)
+                X = np.linalg.solve(A,b)
+                rad = np.arctan(self.m)
+                
+                #print(X)
 
-            xcon = np.matmul(aruco1_baselink,np.array([0.6,-0.7,1]))
+                goalpose = PoseStamped()
+                goalpose.header.stamp = self.insight_aruco.header.stamp
+                goalpose.header.frame_id = 'base_link'
 
-            # print(aruco1_baselink)
-            print(xcon)
+                aruco1_baselink = np.array([[np.cos(rad), -np.sin(rad), 0,  X[0]],[np.sin(rad), np.cos(rad), 0, X[1]], [0, 0, 1, 0], [0,0,0,1]])
 
-            goalpose.pose.position.x = xcon[0]
-            goalpose.pose.position.y = xcon[1]
-            goalpose.pose.position.z =  0
-            orientation = quaternion_from_euler(0,0,rad - np.pi/2)
-            goalpose.pose.orientation.x = orientation[0]
-            goalpose.pose.orientation.y = orientation[1]
-            goalpose.pose.orientation.z = orientation[2]
-            goalpose.pose.orientation.w = orientation[3]
-            # glpt = TransformerROS.transformPose("odom", goalpose)
-            self.turn_goals[1] = goalpose
-            self.turn_goals_odom[1] = self.tf_listener.transformPose("odom", goalpose)
+                goalpose.pose.position.x = X[0]
+                goalpose.pose.position.y = X[1]
+                goalpose.pose.position.z =  0
+                orientation = quaternion_from_euler(0,0,rad)
+                goalpose.pose.orientation.x = orientation[0]
+                goalpose.pose.orientation.y = orientation[1]
+                goalpose.pose.orientation.z = orientation[2]
+                goalpose.pose.orientation.w = orientation[3]
+                # glpt = TransformerROS.transformPose("odom", goalpose)
+                self.turn_goals[0] = goalpose
+                self.turn_goals_odom[0] = self.tf_listener.transformPose("odom", goalpose)
 
-            xcon = np.matmul(aruco1_baselink,np.array([0,-1.2,1]))
-            print(xcon)
+                xcon = np.matmul(aruco1_baselink,np.array([0.7,-0.5,0,1]))
 
-            goalpose.pose.position.x = xcon[0]
-            goalpose.pose.position.y = xcon[1]
-            goalpose.pose.position.z =  0
-            orientation = quaternion_from_euler(0,0,rad - np.pi)
-            goalpose.pose.orientation.x = orientation[0]
-            goalpose.pose.orientation.y = orientation[1]
-            goalpose.pose.orientation.z = orientation[2]
-            goalpose.pose.orientation.w = orientation[3]
-            # glpt = TransformerROS.transformPose("odom", goalpose)
-            self.turn_goals[2] = goalpose
-            self.turn_goals_odom[2] = self.tf_listener.transformPose("odom", goalpose)
+                # print(aruco1_baselink)
+                #print(xcon)
 
-            xcon = np.matmul(aruco1_baselink,np.array([-0.4,-1.2,1]))
-            print(xcon)
+                goalpose.pose.position.x = xcon[0]
+                goalpose.pose.position.y = xcon[1]
+                goalpose.pose.position.z =  0
+                orientation = quaternion_from_euler(0,0,rad - np.pi/2)
+                goalpose.pose.orientation.x = orientation[0]
+                goalpose.pose.orientation.y = orientation[1]
+                goalpose.pose.orientation.z = orientation[2]
+                goalpose.pose.orientation.w = orientation[3]
+                # glpt = TransformerROS.transformPose("odom", goalpose)
+                self.turn_goals[1] = goalpose
+                self.turn_goals_odom[1] = self.tf_listener.transformPose("odom", goalpose)
 
-            goalpose.pose.position.x = xcon[0]
-            goalpose.pose.position.y = xcon[1]
-            goalpose.pose.position.z =  0
-            orientation = quaternion_from_euler(0,0,rad - np.pi)
-            goalpose.pose.orientation.x = orientation[0]
-            goalpose.pose.orientation.y = orientation[1]
-            goalpose.pose.orientation.z = orientation[2]
-            goalpose.pose.orientation.w = orientation[3]
-            # glpt = TransformerROS.transformPose("odom", goalpose)
-            self.turn_goals[3] = goalpose
-            self.turn_goals_odom[3] = self.tf_listener.transformPose("odom", goalpose)
+                xcon = np.matmul(aruco1_baselink,np.array([0,-1.2,0,1]))
+                #print(xcon)
 
-            print(xcon)
+                goalpose.pose.position.x = xcon[0]
+                goalpose.pose.position.y = xcon[1]
+                goalpose.pose.position.z =  0
+                orientation = quaternion_from_euler(0,0,rad - np.pi)
+                goalpose.pose.orientation.x = orientation[0]
+                goalpose.pose.orientation.y = orientation[1]
+                goalpose.pose.orientation.z = orientation[2]
+                goalpose.pose.orientation.w = orientation[3]
+                # glpt = TransformerROS.transformPose("odom", goalpose)
+                self.turn_goals[2] = goalpose
+                self.turn_goals_odom[2] = self.tf_listener.transformPose("odom", goalpose)
+
+                xcon = np.matmul(aruco1_baselink,np.array([-0.2,-1.2,0,1]))
+                #print(xcon)
+
+                goalpose.pose.position.x = xcon[0]
+                goalpose.pose.position.y = xcon[1]
+                goalpose.pose.position.z =  0
+                orientation = quaternion_from_euler(0,0,rad - np.pi)
+                goalpose.pose.orientation.x = orientation[0]
+                goalpose.pose.orientation.y = orientation[1]
+                goalpose.pose.orientation.z = orientation[2]
+                goalpose.pose.orientation.w = orientation[3]
+                # glpt = TransformerROS.transformPose("odom", goalpose)
+                self.turn_goals[3] = goalpose
+                self.turn_goals_odom[3] = self.tf_listener.transformPose("odom", goalpose)
+
+                #print(xcon)
+                
+                for i in range(4):
+                    
+                    marker = Marker()
+                    marker.header.frame_id = "odom"
+                    marker.id = i
+                    marker.type = 2
+                    marker.action = marker.ADD
+                    marker.pose = self.turn_goals_odom[i].pose
+                    marker.color.r = 0.3
+                    marker.color.g = 0.0
+                    marker.color.b = 1.0
+                    marker.color.a = 1.0
+                    marker.scale.x = 0.1
+                    marker.scale.y = 0.1
+                    marker.scale.z = 0.1
+                    marker.frame_locked = False
+                    marker.ns = "Goal-%u"%i
+                    goalmarkers.markers.append(marker) 
+
+                self.aruco_goal_array_pub.publish(goalmarkers)
+            
 
             
     def UpdateArucoU(self, marker_pose):
 
         # should be incremented here
 
-        self.aruco_new = True
+        if self.allow_aruco_callbacks:
 
-        # print("Updating Aruco U")
+            self.aruco_new = True
 
-        #check if new aruco_marker position is out of threshold of self.current_aruco_pos
-        # if np.linalg.norm([marker_pose.pose.position.x - self.insight_aruco.pose.position.x, marker_pose.pose.position.y - self.insight_aruco.pose.position.y, marker_pose.pose.position.z - self.insight_aruco.pose.position.z])>self.aruco_update_dist_threshold:
-            #if true - store self.current_aruco_loc = aruco_marker.position
-        self.insight_aruco = marker_pose  ## Always will be in base_link
+            goalmarkers = MarkerArray()
 
-        self.tf_listener.waitForTransform("odom", "base_link", marker_pose.header.stamp, rospy.Duration(1))
-        self.insight_aruco_odom = self.tf_listener.transformPose("odom", marker_pose)
+            # print("Updating Aruco U")
 
+            #check if new aruco_marker position is out of threshold of self.current_aruco_pos
+            # if np.linalg.norm([marker_pose.pose.position.x - self.insight_aruco.pose.position.x, marker_pose.pose.position.y - self.insight_aruco.pose.position.y, marker_pose.pose.position.z - self.insight_aruco.pose.position.z])>self.aruco_update_dist_threshold:
+                #if true - store self.current_aruco_loc = aruco_marker.position
+            self.insight_aruco = marker_pose  ## Always will be in base_link
 
-        if self.pot_lines:
-            # self.turn_goals = []
-
-            # arpt = TransformerROS.transformPose("base_link", self.insight_aruco)
-            a = self.insight_aruco.pose.position.x
-            b = self.insight_aruco.pose.position.y
-
-            A = np.array([[self.m, -1],[1, self.m]],)
-            b = np.array([-self.c, self.m*b + a])
-
-            X = np.linalg.solve(A,b)
-            rad = np.arctan(self.m)
-
-            goalpose = PoseStamped()
-
-            goalpose.header.stamp = self.insight_aruco.header.stamp
-            goalpose.header.frame_id = '/base_link'
-
-            aruco1_baselink = np.array([[np.cos(rad), -np.sin(rad), X[0]],[np.sin(rad), np.cos(rad), X[1]], [0, 0, 1]])
-
-            goalpose.pose.position.x = X[0]
-            goalpose.pose.position.y = X[1]
-            goalpose.pose.position.z =  0
-            orientation = quaternion_from_euler(0,0,rad)
-            goalpose.pose.orientation.x = orientation[0]
-            goalpose.pose.orientation.y = orientation[1]
-            goalpose.pose.orientation.z = orientation[2]
-            goalpose.pose.orientation.w = orientation[3]
-            # glpt = TransformerROS.transformPose("odom", goalpose)
-
-            self.turn_goals[0] = goalpose
-            self.turn_goals_odom[0] = self.tf_listener.transformPose("odom", goalpose)
-
-            xcon = np.matmul(aruco1_baselink,np.array([0.1,0.1,1]))          
-
-            goalpose.pose.position.x = xcon[0]
-            goalpose.pose.position.y = xcon[1]
-            goalpose.pose.position.z =  0
-            orientation = quaternion_from_euler(0,0,rad + np.pi/2)
-            goalpose.pose.orientation.x = orientation[0]
-            goalpose.pose.orientation.y = orientation[1]
-            goalpose.pose.orientation.z = orientation[2]
-            goalpose.pose.orientation.w = orientation[3]
-            # glpt = TransformerROS.transformPose("odom", goalpose)
-            self.turn_goals[1] = goalpose
-            self.turn_goals_odom[1] = self.tf_listener.transformPose("odom", goalpose)
+            self.tf_listener.waitForTransform("odom", "base_link", marker_pose.header.stamp, rospy.Duration(1))
+            self.insight_aruco_odom = self.tf_listener.transformPose("odom", marker_pose)
 
 
-            xcon = np.matmul(aruco1_baselink,np.array([0.1,0.1,1]))  
+            if self.pot_lines:
+                # self.turn_goals = []
 
-            goalpose.pose.position.x = xcon[0]
-            goalpose.pose.position.y = xcon[1]
-            goalpose.pose.position.z =  0
-            orientation = quaternion_from_euler(0,0,rad + np.pi)
-            goalpose.pose.orientation.x = orientation[0]
-            goalpose.pose.orientation.y = orientation[1]
-            goalpose.pose.orientation.z = orientation[2]
-            goalpose.pose.orientation.w = orientation[3]
-            # glpt = TransformerROS.transformPose("odom", goalpose)
-            self.turn_goals[2] = goalpose
-            self.turn_goals_odom[2] = self.tf_listener.transformPose("odom", goalpose)
+                # arpt = TransformerROS.transformPose("base_link", self.insight_aruco)
+                a = self.insight_aruco.pose.position.x
+                b = self.insight_aruco.pose.position.y
 
-            xcon = np.matmul(aruco1_baselink,np.array([-0.4,0.1,1]))  
+                A = np.array([[self.m, -1],[1, self.m]],)
+                b = np.array([-self.c, self.m*b + a])
 
-            goalpose.pose.position.x = xcon[0]
-            goalpose.pose.position.y = xcon[1]
-            goalpose.pose.position.z =  0
-            orientation = quaternion_from_euler(0,0,rad + np.pi)
-            goalpose.pose.orientation.x = orientation[0]
-            goalpose.pose.orientation.y = orientation[1]
-            goalpose.pose.orientation.z = orientation[2]
-            goalpose.pose.orientation.w = orientation[3]
-            # glpt = TransformerROS.transformPose("odom", goalpose)
-            self.turn_goals[3] = goalpose
-            self.turn_goals_odom[3] = self.tf_listener.transformPose("odom", goalpose)
+                X = np.linalg.solve(A,b)
+                rad = np.arctan(self.m)
+
+                goalpose = PoseStamped()
+
+                goalpose.header.stamp = self.insight_aruco.header.stamp
+                goalpose.header.frame_id = '/base_link'
+
+                aruco1_baselink = np.array([[np.cos(rad), -np.sin(rad), X[0]],[np.sin(rad), np.cos(rad), X[1]], [0, 0, 1]])
+
+                goalpose.pose.position.x = X[0]
+                goalpose.pose.position.y = X[1]
+                goalpose.pose.position.z =  0
+                orientation = quaternion_from_euler(0,0,rad)
+                goalpose.pose.orientation.x = orientation[0]
+                goalpose.pose.orientation.y = orientation[1]
+                goalpose.pose.orientation.z = orientation[2]
+                goalpose.pose.orientation.w = orientation[3]
+                # glpt = TransformerROS.transformPose("odom", goalpose)
+
+                self.turn_goals[0] = goalpose
+                self.turn_goals_odom[0] = self.tf_listener.transformPose("odom", goalpose)
+
+                xcon = np.matmul(aruco1_baselink,np.array([0.1,0.1,1]))          
+
+                goalpose.pose.position.x = xcon[0]
+                goalpose.pose.position.y = xcon[1]
+                goalpose.pose.position.z =  0
+                orientation = quaternion_from_euler(0,0,rad + np.pi/2)
+                goalpose.pose.orientation.x = orientation[0]
+                goalpose.pose.orientation.y = orientation[1]
+                goalpose.pose.orientation.z = orientation[2]
+                goalpose.pose.orientation.w = orientation[3]
+                # glpt = TransformerROS.transformPose("odom", goalpose)
+                self.turn_goals[1] = goalpose
+                self.turn_goals_odom[1] = self.tf_listener.transformPose("odom", goalpose)
+
+
+                xcon = np.matmul(aruco1_baselink,np.array([0.1,0.1,1]))  
+
+                goalpose.pose.position.x = xcon[0]
+                goalpose.pose.position.y = xcon[1]
+                goalpose.pose.position.z =  0
+                orientation = quaternion_from_euler(0,0,rad + np.pi)
+                goalpose.pose.orientation.x = orientation[0]
+                goalpose.pose.orientation.y = orientation[1]
+                goalpose.pose.orientation.z = orientation[2]
+                goalpose.pose.orientation.w = orientation[3]
+                # glpt = TransformerROS.transformPose("odom", goalpose)
+                self.turn_goals[2] = goalpose
+                self.turn_goals_odom[2] = self.tf_listener.transformPose("odom", goalpose)
+
+                xcon = np.matmul(aruco1_baselink,np.array([-0.2,0.1,1]))  
+
+                goalpose.pose.position.x = xcon[0]
+                goalpose.pose.position.y = xcon[1]
+                goalpose.pose.position.z =  0
+                orientation = quaternion_from_euler(0,0,rad + np.pi)
+                goalpose.pose.orientation.x = orientation[0]
+                goalpose.pose.orientation.y = orientation[1]
+                goalpose.pose.orientation.z = orientation[2]
+                goalpose.pose.orientation.w = orientation[3]
+                # glpt = TransformerROS.transformPose("odom", goalpose)
+                self.turn_goals[3] = goalpose
+                self.turn_goals_odom[3] = self.tf_listener.transformPose("odom", goalpose)
+
+
+                for i in range(4):
+                    
+                    marker = Marker()
+                    marker.header.frame_id = "odom"
+                    marker.id = i
+                    marker.type = 2
+                    marker.action = marker.ADD
+                    marker.pose = self.turn_goals_odom[i].pose
+                    marker.color.r = 0.3
+                    marker.color.g = 0.0
+                    marker.color.b = 1.0
+                    marker.color.a = 1.0
+                    marker.scale.x = 0.1
+                    marker.scale.y = 0.1
+                    marker.scale.z = 0.1
+                    marker.frame_locked = False
+                    marker.ns = "Goal-%u"%i
+                    goalmarkers.markers.append(marker) 
+
+                self.aruco_goal_array_pub.publish(goalmarkers)
         #id=69
 
 
@@ -453,20 +523,22 @@ if __name__ == '__main__':
         node.main()
         r = rospy.Rate(node.rate)
 
+        time.sleep(5)
+
         odom_subscriber = rospy.Subscriber('/odom', Odometry, node.odom_update)
 
         pot_line_sub = rospy.Subscriber('/guide_vector_base', PotLine, node.UpdateLine)
 
         #TODO: change aruco topic to be in baselink!!!!!!!!
-        # aruco_sub = rospy.Subscriber('/aruco_simple/pose1', PoseStamped, node.UpdateArucoEnd)
+        aruco_sub1 = rospy.Subscriber('/aruco_simple/pose1', PoseStamped, node.UpdateArucoEnd)
 
         #TODO: change aruco topic to be in baselink!!!!!!!!!!!
-        aruco_sub = rospy.Subscriber('/aruco_simple/pose2', PoseStamped, node.UpdateArucoEnd)
+        aruco_sub2 = rospy.Subscriber('/aruco_simple/pose2', PoseStamped, node.UpdateArucoU)
 
         #TODO: change detection list topic
         # detection_sub = rospy.Subscriber('/detection_list', DetectionList, node.UpdateDetections)
 
-        time.sleep(5)
+        
         while not rospy.is_shutdown():
             # r.sleep()
             
