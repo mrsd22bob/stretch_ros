@@ -1,0 +1,111 @@
+if self.mode == 'exploit':
+            if self.explore_goal:
+                # print(self.explore_goal)
+                if self.insight_aruco_odom:.
+
+                    if self.detection_exes:
+                        print("Aruco Exists")
+                        # for test in range(500):
+                            # try:
+                        # print(self.insight_aruco_odom)
+                        self.insight_aruco_odom.header.stamp = now
+                        # print("Initializing")
+                        self.tf_listener.waitForTransform("/base_link", "/odom", now, rospy.Duration(1))
+                        # aruco_odom = self.tf_listener.transformPose("/odom", self.insight_aruco)
+                        aruco_base_new = self.tf_listener.transformPose("/base_link", self.insight_aruco_odom)
+                                # break
+                            # except:
+                                # print("Waiting for TF to become available")
+                                # pass
+                        # print(test)
+                        # print(aruco_base_new)
+
+                        if (aruco_base_new.pose.position.x > self.detection_exes[0]):
+                            print("Exploring and Checking Aruco")
+                            # print("Time now in explore checking", self.explore_goal.header.stamp)
+                            try:
+                                goalpt = self.tf_listener.transformPose("/odom", self.explore_goal)
+                            except:
+                                self.explore_goal.header.stamp = now
+                                goalpt = self.tf_listener.transformPose("/odom", self.explore_goal)
+
+                            goal = MoveBaseGoal()
+                            goal.target_pose.header.frame_id = "odom"
+                            goal.target_pose.header.stamp = rospy.Time.now()
+                            goal.target_pose.pose.position = goalpt.pose.position
+                            goal.target_pose.pose.orientation = goalpt.pose.orientation
+
+                            self.movebase_client.send_goal(goal)
+                            wait = self.movebase_client.wait_for_result()
+                    
+                        elif self.aruco_new==True):
+                            print("Sending Aruco Goal")
+
+                            self.aruco_new = False
+                            self.allow_aruco_callbacks = False
+
+                            for i in range(4):
+                                # goalpt = self.tf_listener.transformPose("/odom", self.turn_goals_odom[i])
+                                goal = MoveBaseGoal()
+                                goal.target_pose.header.frame_id = "odom"
+                                goal.target_pose.header.stamp = rospy.Time.now()
+                                # goal.target_pose.pose.position = goalpt.pose.position
+                                # goal.target_pose.pose.orientation = goalpt.pose.orientation
+
+                                goal.target_pose.pose.position = self.turn_goals_odom[i].pose.position
+                                goal.target_pose.pose.orientation = self.turn_goals_odom[i].pose.orientation
+                                
+                                
+                                print("Sent Aruco point ", i)
+                                print("The goal sent to nav is:", goal)
+
+                                self.movebase_client.send_goal(goal)
+                                wait = self.movebase_client.wait_for_result()
+                                
+                                print("Completed Aruco goal ", i)
+
+                            self.allow_aruco_callbacks = True
+
+                    
+                    else:
+                        print("No detections so just exploring")
+                        try:
+                            goalpt = self.tf_listener.transformPose("/odom", self.explore_goal)
+                        except:
+                            self.explore_goal.header.stamp = now
+                            goalpt = self.tf_listener.transformPose("/odom", self.explore_goal)
+
+                        goal = MoveBaseGoal()
+                        goal.target_pose.header.frame_id = "odom"
+                        goal.target_pose.header.stamp = rospy.Time.now()
+                        goal.target_pose.pose.position = goalpt.pose.position
+                        goal.target_pose.pose.orientation = goalpt.pose.orientation
+
+                        self.movebase_client.send_goal(goal)
+                        wait = self.movebase_client.wait_for_result()
+
+
+                        
+
+
+                else:
+                    print("Exploring but no aruco in sight")
+
+                    try:
+                            goalpt = self.tf_listener.transformPose("/odom", self.explore_goal)
+                    except:
+                            self.explore_goal.header.stamp = now
+                            goalpt = self.tf_listener.transformPose("/odom", self.explore_goal)
+                    
+                    # print("After listener")
+                    goal = MoveBaseGoal()
+                    goal.target_pose.header.frame_id = "odom"
+                    goal.target_pose.header.stamp = rospy.Time.now()
+                    goal.target_pose.pose.position = goalpt.pose.position
+                    goal.target_pose.pose.orientation = goalpt.pose.orientation
+                    # print("a")
+
+                    if not (self.explore_goal.pose.position.x ==0 and self.explore_goal.pose.position.y ==0):
+                        print("Sending Goal")
+                        self.movebase_client.send_goal(goal)
+                        wait = self.movebase_client.wait_for_result()

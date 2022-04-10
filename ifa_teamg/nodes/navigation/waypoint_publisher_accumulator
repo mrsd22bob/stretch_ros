@@ -19,6 +19,8 @@ from visualization_msgs.msg import MarkerArray, Marker
 
 from move_base_msgs.msg import MoveBaseActionGoal
 
+import bisect
+
 #for quaternion tranformation from Euler to Quaternion
 from tf.transformations import quaternion_from_euler
 
@@ -75,6 +77,10 @@ class NavPlanner():
         #Line parameters in the bse_link after processing LiDAR
         self.m = None
         self.c = None
+
+        self.detection_exes = []
+        self.detection_list = []
+        self.detection_goals = []
         
         self.aruco_goal_array_pub = rospy.Publisher("aruco_goal_markers", MarkerArray, queue_size=1)
 
@@ -502,13 +508,32 @@ class NavPlanner():
 
 
     """TO BE DONE LATER WHEN DETECTIONS ARE MADE AVAILABLE"""
-    # def update_detections(self, listOfDetections):
+    def update_detections(self, detection):
 
-    #     self.detection_list = []
+        #From the detection that we just received, we extract the waypoint
+        #that is parallel to the guide vector aligined with the pots
 
-    #     for m in listOfDetections:
-    #         self.detection_list.append(m.position)
-    # 
+        a = detection.pose.position.x
+        b = detection.pose.position.y
+
+        A = np.array([[self.m, -1],[1, self.m]],)
+        b = np.array([-self.c, self.m*b + a])
+
+        X = np.linalg.solve(A,b)
+        rad = np.arctan(self.m)
+
+
+        if self.detection_exes==[]:
+            self.detection_exes.append(detection.pose.position.x)
+            self.detection_list.append(detection)
+
+        else:
+            ind = bisect.bisect(self.detection_exes,detection.pose.position.x)
+            self.detection_exes.insert(ind, detection.pose.position.x)
+            self.detection_list.insert(ind, detection)
+
+        
+ 
     def main(self):
         rospy.init_node('waypoint_accumulator_publisher', anonymous=True)
         self.movebase_client = actionlib.SimpleActionClient('move_base',MoveBaseAction)
@@ -536,7 +561,7 @@ if __name__ == '__main__':
         aruco_sub2 = rospy.Subscriber('/aruco_simple/pose2', PoseStamped, node.UpdateArucoU)
 
         #TODO: change detection list topic
-        # detection_sub = rospy.Subscriber('/detection_list', DetectionList, node.UpdateDetections)
+        detection_sub = rospy.Subscriber('/detections', PoseStamped, node.UpdateDetections)
 
         
         while not rospy.is_shutdown():
