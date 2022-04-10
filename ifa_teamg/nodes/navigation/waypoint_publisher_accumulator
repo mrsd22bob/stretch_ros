@@ -100,8 +100,8 @@ class NavPlanner():
         #Move-base Publisher for the base
         # self.move_base_goal_pub = rospy.Publisher("move_base/goal", MoveBaseActionGoal, queue_size=1)
 
-        #Move-base Simple Goal Publisher for the base
-        # self.move_base_simple_goal_pub = rospy.Publisher("/move_base_simple/goal", PoseStamped, queue_size=1)
+        #RVIZ Publisher to visualize goal being tracked
+        self.viz_goal_pub = rospy.Publisher("/current_nav_goal", PoseStamped, queue_size=1)
 
     #def display_test_stats()
 
@@ -522,15 +522,31 @@ class NavPlanner():
         X = np.linalg.solve(A,b)
         rad = np.arctan(self.m)
 
+        link_in_base_transform = self.tf2_buffer.lookup_transform('base_link', 'link_lift', rospy.Time(0))
+
+        goalpose = PoseStamped()
+
+        goalpose.pose.position.x = X[0] + link_in_base_transform.transform.translation.x
+        goalpose.pose.position.y = X[1]
+        goalpose.pose.position.z =  0
+        orientation = quaternion_from_euler(0,0,rad)
+        goalpose.pose.orientation.x = orientation[0]
+        goalpose.pose.orientation.y = orientation[1]
+        goalpose.pose.orientation.z = orientation[2]
+        goalpose.pose.orientation.w = orientation[3]
+        # glpt = TransformerROS.transformPose("odom", goalpose)
+        # self.detection_goals.append(goalpose)
 
         if self.detection_exes==[]:
             self.detection_exes.append(detection.pose.position.x)
             self.detection_list.append(detection)
+            self.detection_goals.append(goalpose)
 
         else:
             ind = bisect.bisect(self.detection_exes,detection.pose.position.x)
             self.detection_exes.insert(ind, detection.pose.position.x)
             self.detection_list.insert(ind, detection)
+            self.detection_goals.insert(ind, goalpose)
 
         
  

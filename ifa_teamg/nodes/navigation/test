@@ -21,13 +21,13 @@ if self.mode == 'exploit':
                         # print(aruco_base_new)
 
                         if (aruco_base_new.pose.position.x > self.detection_exes[0]):
-                            print("Exploring and Checking Aruco")
+                            print("Exploiting and Checking Aruco")
                             # print("Time now in explore checking", self.explore_goal.header.stamp)
                             try:
-                                goalpt = self.tf_listener.transformPose("/odom", self.explore_goal)
+                                goalpt = self.tf_listener.transformPose("/odom", self.detection_goals[0])
                             except:
                                 self.explore_goal.header.stamp = now
-                                goalpt = self.tf_listener.transformPose("/odom", self.explore_goal)
+                                goalpt = self.tf_listener.transformPose("/odom", self.detection_goals[0])
 
                             goal = MoveBaseGoal()
                             goal.target_pose.header.frame_id = "odom"
@@ -35,10 +35,19 @@ if self.mode == 'exploit':
                             goal.target_pose.pose.position = goalpt.pose.position
                             goal.target_pose.pose.orientation = goalpt.pose.orientation
 
+                            #For goal visualization
+                            self.viz_goal_pub.publish(self.detection_goals[0])
+
                             self.movebase_client.send_goal(goal)
                             wait = self.movebase_client.wait_for_result()
+
+                            #Delete the first goal from the list of detections
+                            #after tracking it from the list
+                            self.detection_exes.pop(0)
+                            self.detection_list.pop(0)
+                            self.detection_goals.pop(0)
                     
-                        elif self.aruco_new==True):
+                        elif (self.aruco_new==True):
                             print("Sending Aruco Goal")
 
                             self.aruco_new = False
