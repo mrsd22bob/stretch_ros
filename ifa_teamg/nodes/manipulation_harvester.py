@@ -222,11 +222,11 @@ class Manipulation_pr4(hm.HelloNode):
 
 
 if __name__ == '__main__':
-    try:
-        bp_to_man_server() 
+    try: 
         node = Manipulation_pr4()      
         node.main() 
-        while(1):
+        bp_to_man_server()
+        while(not rospy.is_shutdown()):
             if(man_no_op_flag==1):
                 node.wristbb_sub = rospy.Subscriber("/aruco_head/pose3", PoseStamped, node.moveWristToBoundingBox, queue_size=1)
                 #man_no_op

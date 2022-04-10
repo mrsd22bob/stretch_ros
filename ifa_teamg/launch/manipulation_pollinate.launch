@@ -7,7 +7,7 @@
   <!-- -->
     
   <!-- MANIPULATION TESTING LAUNCH -->
-  <node name="manipulation_pr4" pkg="ifa_teamg" type="manipulation_pr4.py" output="screen" args=''/>
+  <node name="manipulation_pollinate" pkg="ifa_teamg" type="manipulation_pollinate.py" output="screen" args=''/>
   <!-- -->
 
   <!-- HEAD CAMERA -->

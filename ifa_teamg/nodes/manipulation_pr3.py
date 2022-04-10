@@ -158,8 +158,8 @@ class Manipulation_pr3(hm.HelloNode):
 		self.tf_buffer = tf2_ros.Buffer(rospy.Duration(10))
 		self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
 		
-		# self.wrist_sub = rospy.Subscriber("/aruco_simple/pose", PoseStamped, self.moveWristToBoundingBox, queue_size=1)
-		self.wrist_sub = rospy.Subscriber("/aruco_simple/pose", PoseStamped, self.moveWristToMarker, queue_size=1)
+		self.head_sub = rospy.Subscriber("/aruco_head/pose3", PoseStamped, self.moveWristToBoundingBox, queue_size=1) #49	
+		self.wrist_sub = rospy.Subscriber("/aruco_wrist/pose1", PoseStamped, self.moveWristToMarker, queue_size=1) #39
 
 
 if __name__ == '__main__':
