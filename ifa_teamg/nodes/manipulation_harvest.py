@@ -288,7 +288,7 @@ class Manipulation_pr4(hm.HelloNode):
 		self.pose_desired_lift = {'joint_lift' : self.pose_lift}
 		self.pose_desired_arm = {'wrist_extension' :self.pose_arm-.37}
 		
-		self.harvest_home() #add only once in main start code
+		# self.harvest_home() #add only once in main start code
 		self.move_to_pose(self.pose_desired_lift)
 		self.trajectory_client.wait_for_result()    
 		self.move_to_pose(self.pose_desired_arm)
