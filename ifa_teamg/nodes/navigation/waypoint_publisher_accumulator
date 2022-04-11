@@ -68,7 +68,7 @@ class NavPlanner():
 
         self.turn_goals_odom = [None, None, None, None]
 
-        self.mode = 'explore'
+        self.mode = 'exploit'
 
         self.aruco_new = False
 
@@ -83,22 +83,6 @@ class NavPlanner():
         self.detection_goals = []
         
         self.aruco_goal_array_pub = rospy.Publisher("aruco_goal_markers", MarkerArray, queue_size=1)
-
-        #Using the twist for rudimentary motion implementation without using move_base
-        # self.twist_msg = Twist()
-
-        #Using MoveBaseActionGoal for motion implementation using move_base
-        # self.move_msg = MoveBaseActionGoal()
-        # self.move_msg_count = 0
-
-        # self.move_msg_simple = PoseStamped()
-        # self.move_msg_count = 0
-
-        #Velocity Publisher for the base
-        # self.velocity_pub = rospy.Publisher("/stretch/cmd_vel", Twist, queue_size=1)
-
-        #Move-base Publisher for the base
-        # self.move_base_goal_pub = rospy.Publisher("move_base/goal", MoveBaseActionGoal, queue_size=1)
 
         #RVIZ Publisher to visualize goal being tracked
         self.viz_goal_pub = rospy.Publisher("/current_nav_goal", PoseStamped, queue_size=1)
@@ -143,6 +127,9 @@ class NavPlanner():
                         goal.target_pose.pose.position = goalpt.pose.position
                         goal.target_pose.pose.orientation = goalpt.pose.orientation
 
+                        #For goal visualization
+                        self.viz_goal_pub.publish(goalpt)
+
                         self.movebase_client.send_goal(goal)
                         wait = self.movebase_client.wait_for_result()
                 
@@ -166,6 +153,9 @@ class NavPlanner():
                             
                             print("Sent Aruco point ", i)
                             print("The goal sent to nav is:", goal)
+
+                            #For goal visualization
+                            self.viz_goal_pub.publish(self.turn_goals_odom[i])
 
                             self.movebase_client.send_goal(goal)
                             wait = self.movebase_client.wait_for_result()
@@ -197,12 +187,143 @@ class NavPlanner():
 
                     if not (self.explore_goal.pose.position.x ==0 and self.explore_goal.pose.position.y ==0):
                         print("Sending Goal")
+
+                        #For goal visualization
+                        self.viz_goal_pub.publish(goalpt)
+
                         self.movebase_client.send_goal(goal)
                         wait = self.movebase_client.wait_for_result()
                         # print("b")
 
                 # except:
                 #     pass
+
+        elif self.mode == 'exploit':
+            if self.explore_goal:
+                # print(self.explore_goal)
+                if self.insight_aruco_odom:
+                
+                    if self.detection_exes:
+                        print("Aruco Exists")
+                        # for test in range(500):
+                            # try:
+                        # print(self.insight_aruco_odom)
+                        self.insight_aruco_odom.header.stamp = now
+                        # print("Initializing")
+                        self.tf_listener.waitForTransform("/base_link", "/odom", now, rospy.Duration(1))
+                        # aruco_odom = self.tf_listener.transformPose("/odom", self.insight_aruco)
+                        aruco_base_new = self.tf_listener.transformPose("/base_link", self.insight_aruco_odom)
+                                # break
+                            # except:
+                                # print("Waiting for TF to become available")
+                                # pass
+                        # print(test)
+                        # print(aruco_base_new)
+
+                        if (aruco_base_new.pose.position.x > self.detection_exes[0]):
+                            print("Exploiting and Checking Aruco")
+                            # print("Time now in explore checking", self.explore_goal.header.stamp)
+                            try:
+                                goalpt = self.tf_listener.transformPose("/odom", self.detection_goals[0])
+                            except:
+                                self.explore_goal.header.stamp = now
+                                goalpt = self.tf_listener.transformPose("/odom", self.detection_goals[0])
+
+                            goal = MoveBaseGoal()
+                            goal.target_pose.header.frame_id = "odom"
+                            goal.target_pose.header.stamp = rospy.Time.now()
+                            goal.target_pose.pose.position = goalpt.pose.position
+                            goal.target_pose.pose.orientation = goalpt.pose.orientation
+
+                            #For goal visualization
+                            self.viz_goal_pub.publish(self.detection_goals[0])
+
+                            self.movebase_client.send_goal(goal)
+                            wait = self.movebase_client.wait_for_result()
+
+                            #Delete the first goal from the list of detections
+                            #after tracking it from the list
+                            self.detection_exes.pop(0)
+                            self.detection_list.pop(0)
+                            self.detection_goals.pop(0)
+                    
+                        elif (self.aruco_new==True):
+                            print("Sending Aruco Goal")
+
+                            self.aruco_new = False
+                            self.allow_aruco_callbacks = False
+
+                            for i in range(4):
+                                # goalpt = self.tf_listener.transformPose("/odom", self.turn_goals_odom[i])
+                                goal = MoveBaseGoal()
+                                goal.target_pose.header.frame_id = "odom"
+                                goal.target_pose.header.stamp = rospy.Time.now()
+                                # goal.target_pose.pose.position = goalpt.pose.position
+                                # goal.target_pose.pose.orientation = goalpt.pose.orientation
+
+                                goal.target_pose.pose.position = self.turn_goals_odom[i].pose.position
+                                goal.target_pose.pose.orientation = self.turn_goals_odom[i].pose.orientation
+                                
+                                
+                                print("Sent Aruco point ", i)
+                                print("The goal sent to nav is:", goal)
+
+                                #For goal visualization
+                                self.viz_goal_pub.publish(self.turn_goals_odom[i])
+
+                                self.movebase_client.send_goal(goal)
+                                wait = self.movebase_client.wait_for_result()
+                                
+                                print("Completed Aruco goal ", i)
+
+                            self.allow_aruco_callbacks = True
+
+                    
+                    else:
+                        print("No detections so just exploring")
+                        try:
+                            goalpt = self.tf_listener.transformPose("/odom", self.explore_goal)
+                        except:
+                            self.explore_goal.header.stamp = now
+                            goalpt = self.tf_listener.transformPose("/odom", self.explore_goal)
+
+                        goal = MoveBaseGoal()
+                        goal.target_pose.header.frame_id = "odom"
+                        goal.target_pose.header.stamp = rospy.Time.now()
+                        goal.target_pose.pose.position = goalpt.pose.position
+                        goal.target_pose.pose.orientation = goalpt.pose.orientation
+
+                        #For goal visualization
+                        self.viz_goal_pub.publish(goalpt)
+
+                        self.movebase_client.send_goal(goal)
+                        wait = self.movebase_client.wait_for_result()
+
+
+                        
+
+
+                else:
+                    print("Exploring but no aruco in sight")
+
+                    try:
+                            goalpt = self.tf_listener.transformPose("/odom", self.explore_goal)
+                    except:
+                            self.explore_goal.header.stamp = now
+                            goalpt = self.tf_listener.transformPose("/odom", self.explore_goal)
+                    
+                    # print("After listener")
+                    goal = MoveBaseGoal()
+                    goal.target_pose.header.frame_id = "odom"
+                    goal.target_pose.header.stamp = rospy.Time.now()
+                    goal.target_pose.pose.position = goalpt.pose.position
+                    goal.target_pose.pose.orientation = goalpt.pose.orientation
+                    # print("a")
+
+                    if not (self.explore_goal.pose.position.x ==0 and self.explore_goal.pose.position.y ==0):
+                        print("Sending Goal")
+                        self.movebase_client.send_goal(goal)
+                        wait = self.movebase_client.wait_for_result()
         else:
             print("No Waypoints or Pots to Track")
 
