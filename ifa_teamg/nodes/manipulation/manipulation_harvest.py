@@ -104,32 +104,7 @@ class Manipulation_pr4(hm.HelloNode):
 		self.wristbb_sub = rospy.Subscriber("/aruco_head/pose3", PoseStamped, self.moveWristToBoundingBox, queue_size=1) #49
 
 
-	#def turnOnManipulationMode(self):
-	#    pass
 
-	# def move_to_initial_configuration(self):
-	#   rospy.loginfo('Move to the initial position.')
-	#   self.move_to_pose(self.init_pose)
-
-	# # then, the robot needs to stop. 
-
-	def harvest_home(self):
-		c=cutter.VFACutter()
-		g=gripper.VFAGripper()
-		if not g.startup():
-				exit()
-		if not c.startup():
-				exit()
-		print("Homing gripper")
-		g.home()
-		print("Homing cutter")
-		c.home()
-		time.sleep(3.0)
-		g.open()
-		c.open()
-		time.sleep(3.0)
-		g.stop()
-		c.stop()
 	
 	def harvest(self):
 		c=cutter.VFACutter()
@@ -153,26 +128,6 @@ class Manipulation_pr4(hm.HelloNode):
 		time.sleep(2.0)
 		g.stop()
 		c.stop()
-
-	def pollinate(self):
-		p=pollinator.VFAPollinator()
-
-		if not p.startup():
-			exit()	
-		print("moving to start position")
-		p.movetostartpos()
-		time.sleep(0.5)
-
-		#start vibration
-
-		p.movetopos2()
-		time.sleep(0.5)
-		p.movetopos3()
-		time.sleep(0.5)
-		p.movetozero()
-		#stop vibration
-		time.sleep(3.0)
-		p.stop()
 
 
 	def moveWristToBoundingBox(self, pose):
@@ -296,11 +251,13 @@ class Manipulation_pr4(hm.HelloNode):
 		self.harvest()
 			#self.pollinate()
 		self.move_to_pose(self.retractarm)
+		self.trajectory_client.wait_for_result()
 		self.move_to_pose(self.lowerlift)
 		self.trajectory_client.wait_for_result()
 		self.g.open()
 		self.trajectory_client.wait_for_result()
-			
+
+		self.wristpoi_sub.unregister()	
 
 		# self.arrivedMarker = True
 		global man_op_over
