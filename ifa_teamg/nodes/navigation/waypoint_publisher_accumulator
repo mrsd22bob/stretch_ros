@@ -32,6 +32,7 @@ import ros_numpy as rnp
 import numpy as np
 
 import tf
+import tf2_ros
 
 import actionlib
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
@@ -199,11 +200,15 @@ class NavPlanner():
                 #     pass
 
         elif self.mode == 'exploit':
+            # print("In exploit")
             if self.explore_goal:
                 # print(self.explore_goal)
                 if self.insight_aruco_odom:
+
+                    
                 
                     if self.detection_exes:
+                        print(self.detection_exes)
                         print("Aruco Exists")
                         # for test in range(500):
                             # try:
@@ -629,45 +634,50 @@ class NavPlanner():
 
 
     """TO BE DONE LATER WHEN DETECTIONS ARE MADE AVAILABLE"""
-    def update_detections(self, detection):
+    def UpdateDetections(self, detection):
 
         #From the detection that we just received, we extract the waypoint
         #that is parallel to the guide vector aligined with the pots
 
-        a = detection.pose.position.x
-        b = detection.pose.position.y
+        print("Received a cluster detection")
 
-        A = np.array([[self.m, -1],[1, self.m]],)
-        b = np.array([-self.c, self.m*b + a])
+        if self.pot_lines:
 
-        X = np.linalg.solve(A,b)
-        rad = np.arctan(self.m)
+            a = detection.pose.position.x
+            b = detection.pose.position.y
 
-        link_in_base_transform = self.tf2_buffer.lookup_transform('base_link', 'link_lift', rospy.Time(0))
+            A = np.array([[self.m, -1],[1, self.m]],)
+            b = np.array([-self.c, self.m*b + a])
 
-        goalpose = PoseStamped()
+            X = np.linalg.solve(A,b)
+            rad = np.arctan(self.m)
 
-        goalpose.pose.position.x = X[0] + link_in_base_transform.transform.translation.x
-        goalpose.pose.position.y = X[1]
-        goalpose.pose.position.z =  0
-        orientation = quaternion_from_euler(0,0,rad)
-        goalpose.pose.orientation.x = orientation[0]
-        goalpose.pose.orientation.y = orientation[1]
-        goalpose.pose.orientation.z = orientation[2]
-        goalpose.pose.orientation.w = orientation[3]
-        # glpt = TransformerROS.transformPose("odom", goalpose)
-        # self.detection_goals.append(goalpose)
+            link_in_base_transform = self.tf2_buffer.lookup_transform('base_link', 'link_lift', rospy.Time(0))
 
-        if self.detection_exes==[]:
-            self.detection_exes.append(detection.pose.position.x)
-            self.detection_list.append(detection)
-            self.detection_goals.append(goalpose)
+            goalpose = PoseStamped()
 
-        else:
-            ind = bisect.bisect(self.detection_exes,detection.pose.position.x)
-            self.detection_exes.insert(ind, detection.pose.position.x)
-            self.detection_list.insert(ind, detection)
-            self.detection_goals.insert(ind, goalpose)
+            goalpose.header.frame_id = "base_link"
+            goalpose.pose.position.x = X[0] + link_in_base_transform.transform.translation.x
+            goalpose.pose.position.y = X[1]
+            goalpose.pose.position.z =  0
+            orientation = quaternion_from_euler(0,0,rad)
+            goalpose.pose.orientation.x = orientation[0]
+            goalpose.pose.orientation.y = orientation[1]
+            goalpose.pose.orientation.z = orientation[2]
+            goalpose.pose.orientation.w = orientation[3]
+            # glpt = TransformerROS.transformPose("odom", goalpose)
+            # self.detection_goals.append(goalpose)
+
+            if self.detection_exes==[]:
+                self.detection_exes.append(detection.pose.position.x)
+                self.detection_list.append(detection)
+                self.detection_goals.append(goalpose)
+
+            else:
+                ind = bisect.bisect(self.detection_exes,detection.pose.position.x)
+                self.detection_exes.insert(ind, detection.pose.position.x)
+                self.detection_list.insert(ind, detection)
+                self.detection_goals.insert(ind, goalpose)
 
         
  
@@ -675,6 +685,9 @@ class NavPlanner():
         rospy.init_node('waypoint_accumulator_publisher', anonymous=True)
         self.movebase_client = actionlib.SimpleActionClient('move_base',MoveBaseAction)
         self.tf_listener = tf.TransformListener(rospy.Duration(100))
+
+        self.tf2_buffer = tf2_ros.Buffer()
+        self.tf2_listener = tf2_ros.TransformListener(self.tf2_buffer)
         
 
 
