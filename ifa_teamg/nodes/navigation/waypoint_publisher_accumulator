@@ -94,9 +94,9 @@ class NavPlanner():
         now = rospy.Time.now()
         if self.mode == 'explore':
             if self.explore_goal:
-                # print(self.explore_goal)
                 if self.insight_aruco_odom:
-                    print("Aruco Exists")
+                    print("Explore Mode Cycle Started WITH valid Explore Goal and Aruco Point")
+                    rospy.loginfo("Explore Mode Cycle Started WITH valid Explore Goal and Aruco Point")
                     
                     # for test in range(500):
                         # try:
@@ -114,11 +114,13 @@ class NavPlanner():
                     # print(aruco_base_new)
 
                     if (aruco_base_new.pose.position.x - self.explore_goal.pose.position.x) > 0.3:
-                        print("Exploring and Checking Aruco")
+                        print("The Aruco is Still Ahead of the Target Explore Goal")
+                        rospy.loginfo("The Aruco is Still Ahead of the Target Explore Goal")
                         # print("Time now in explore checking", self.explore_goal.header.stamp)
                         try:
                             goalpt = self.tf_listener.transformPose("/odom", self.explore_goal)
                         except:
+                            rospy.loginfo("There was an Issue in Converting the Explore Goal to Odom Frame")
                             self.explore_goal.header.stamp = now
                             goalpt = self.tf_listener.transformPose("/odom", self.explore_goal)
 
@@ -131,11 +133,15 @@ class NavPlanner():
                         #For goal visualization
                         self.viz_goal_pub.publish(goalpt)
 
+                        print("Sending the Target Explore Goal to MoveBase")
+                        rospy.loginfo("Sending the Target Explore Goal to MoveBase")
+
                         self.movebase_client.send_goal(goal)
                         wait = self.movebase_client.wait_for_result()
                 
                     elif ((aruco_base_new.pose.position.x - self.explore_goal.pose.position.x) <= 0.3 and (self.insight_aruco.pose.position.x - self.explore_goal.pose.position.x) > 0 and self.aruco_new==True):
-                        print("Sending Aruco Goal")
+                        print("The Robot is Sufficiently Close to the Aruco Tag")
+                        rospy.loginfo("The Robot is Sufficiently Close to the Aruco Tag")
 
                         self.aruco_new = False
                         self.allow_aruco_callbacks = False
@@ -152,8 +158,11 @@ class NavPlanner():
                             goal.target_pose.pose.orientation = self.turn_goals_odom[i].pose.orientation
                             
                             
-                            print("Sent Aruco point ", i)
-                            print("The goal sent to nav is:", goal)
+                            # print("Sent Aruco point ", i+1)
+                            # print("The goal sent to nav is:", goal)
+
+                            print("Goal number ", i+1, " Extracted from Aruco Markers has Been Sent to MoveBase")
+                            rospy.loginfo("Sent Aruco Based Goal " + str(i+1))
 
                             #For goal visualization
                             self.viz_goal_pub.publish(self.turn_goals_odom[i])
@@ -161,20 +170,19 @@ class NavPlanner():
                             self.movebase_client.send_goal(goal)
                             wait = self.movebase_client.wait_for_result()
                             
-                            print("Completed Aruco goal ", i)
+                            rospy.loginfo("Completed Tracking of Aruco Based Goal " + str(i+1))
 
                         self.allow_aruco_callbacks = True
 
-
-                        
-
-
                 else:
-                    print("Exploring but no aruco in sight")
+                    # print("Exploring but no aruco in sight")
+                    print("Explore Mode Cycle Started with valid Explore Goal but WITHOUT Aruco Point")
+                    rospy.loginfo("Explore Mode Cycle Started with valid Explore Goal but WITHOUT Aruco Point")
 
                     try:
                             goalpt = self.tf_listener.transformPose("/odom", self.explore_goal)
                     except:
+                            rospy.loginfo("There was an Issue in Converting the Explore Goal to Odom Frame")
                             self.explore_goal.header.stamp = now
                             goalpt = self.tf_listener.transformPose("/odom", self.explore_goal)
                     
@@ -187,7 +195,10 @@ class NavPlanner():
                     # print("a")
 
                     if not (self.explore_goal.pose.position.x ==0 and self.explore_goal.pose.position.y ==0):
-                        print("Sending Goal")
+                        # print("Sending Goal")
+
+                        print("Sending the Target Explore Goal to MoveBase")
+                        rospy.loginfo("Sending the Target Explore Goal to MoveBase")
 
                         #For goal visualization
                         self.viz_goal_pub.publish(goalpt)
@@ -204,12 +215,16 @@ class NavPlanner():
             if self.explore_goal:
                 # print(self.explore_goal)
                 if self.insight_aruco_odom:
+                    # print("EXPLOIT Mode Cycle Started WITH Pots and Aruco Point in Sight along with Available Cluster Goals")
+                    # rospy.loginfo("EXPLOIT Mode Cycle Started WITH Pots and Aruco Point in Sight along with Available Cluster Goals")
 
-                    
-                
                     if self.detection_exes:
-                        print(self.detection_exes)
-                        print("Aruco Exists")
+                        # print("EXPLOIT Mode Cycle Started WITH Pots and Aruco Point in Sight")
+                        print("EXPLOIT Mode Cycle Started WITH Pots and Aruco Point in Sight along with Available Cluster Goals")
+                        rospy.loginfo("EXPLOIT Mode Cycle Started WITH Pots and Aruco Point in Sight along with Available Cluster Goals")
+
+                        # print(self.detection_exes)
+                        # print("Aruco Exists")
                         # for test in range(500):
                             # try:
                         # print(self.insight_aruco_odom)
@@ -226,11 +241,14 @@ class NavPlanner():
                         # print(aruco_base_new)
 
                         if (aruco_base_new.pose.position.x > self.detection_exes[0]):
-                            print("Exploiting and Checking Aruco")
+                            # print("Exploiting and Checking Aruco")
+                            print("The Aruco is Still Ahead of the Target Cluster Goal Waypoint")
+                            rospy.loginfo("The Aruco is Still Ahead of the Target Cluster Goal Waypoint")
                             # print("Time now in explore checking", self.explore_goal.header.stamp)
                             try:
                                 goalpt = self.tf_listener.transformPose("/odom", self.detection_goals[0])
                             except:
+                                rospy.loginfo("There was an Issue in Converting the Exploit Goal to Odom Frame")
                                 self.explore_goal.header.stamp = now
                                 goalpt = self.tf_listener.transformPose("/odom", self.detection_goals[0])
 
@@ -242,6 +260,9 @@ class NavPlanner():
 
                             #For goal visualization
                             self.viz_goal_pub.publish(self.detection_goals[0])
+
+                            print("Sending the Target Exploit Goal to MoveBase")
+                            rospy.loginfo("Sending the Target Exploit Goal to MoveBase")
 
                             self.movebase_client.send_goal(goal)
                             wait = self.movebase_client.wait_for_result()
